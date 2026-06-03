@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "daily"        
+    groups:
+      spark-dependencies:
+        patterns:
+          - "org.apache.spark:*"
+      other-dependencies:
+        dependency-type: "production"
+    open-pull-requests-limit: 10
+    # 可选：忽略 Spark 核心版本（避免意外升级 Spark 本身）
+    # ignore:
+    #   - dependency-name: "org.apache.spark:*"
+    #     versions: [">= 3.5"]
