@@ -1,0 +1,36 @@
+# IDE 配置文件
+.idea/
+*.iml
+.vscode/
+
+# 构建产物
+target/
+build/
+*.class
+*.jar
+
+# 日志文件
+*.log
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 依赖管理工具缓存
+.gradle/
+.mvn/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# 数据文件（可选）
+# dataset/
+# cleanedDataset/
+# truncatedDataset/
