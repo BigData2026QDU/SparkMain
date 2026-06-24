@@ -1,6 +1,9 @@
 -- 任务1: 基础聚合分析 - 电影平均评分统计
--- 分析每部电影的平均评分、评分次数、最高分、最低分
+-- 使用 Hive on Spark 执行
 -- 展示基础聚合函数的使用
+
+SET hive.execution.engine=spark;
+SET spark.master=local[*];
 
 USE bigdata_ana;
 

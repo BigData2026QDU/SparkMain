@@ -1,6 +1,9 @@
 -- 任务4: 时间分析 - 评分时间趋势
--- 分析评分的时间分布、年度趋势、活跃时段
+-- 使用 Hive on Spark 执行
 -- 展示日期函数和时间窗口分析
+
+SET hive.execution.engine=spark;
+SET spark.master=local[*];
 
 USE bigdata_ana;
 

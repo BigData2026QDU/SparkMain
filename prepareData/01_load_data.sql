@@ -1,5 +1,8 @@
 -- 数据准备：加载数据到 Hive 表
--- 这个脚本在 initializeSQL 之后执行
+-- 使用 Hive on Spark 执行
+
+SET hive.execution.engine=spark;
+SET spark.master=local[*];
 
 USE bigdata_ana;
 

@@ -1,6 +1,9 @@
 -- 任务5: 用户行为分析 - 活跃用户和偏好
--- 分析用户评分行为、活跃度、偏好类型
+-- 使用 Hive on Spark 执行
 -- 展示复杂子查询和用户画像分析
+
+SET hive.execution.engine=spark;
+SET spark.master=local[*];
 
 USE bigdata_ana;
 

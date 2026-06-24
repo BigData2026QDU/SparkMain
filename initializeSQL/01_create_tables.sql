@@ -1,3 +1,7 @@
+-- 设置 Hive 执行引擎为 Spark
+SET hive.execution.engine=spark;
+SET spark.master=local[*];
+
 -- 创建 Hive 数据库（如果不存在）
 CREATE DATABASE IF NOT EXISTS bigdata_ana;
 

@@ -1,6 +1,9 @@
 -- 任务3: 类型分析 - 电影类型分布和评分
--- 分析各类型的电影数量、平均评分、最受欢迎类型
+-- 使用 Hive on Spark 执行
 -- 展示 LATERAL VIEW 和字符串处理的使用
+
+SET hive.execution.engine=spark;
+SET spark.master=local[*];
 
 USE bigdata_ana;
 
