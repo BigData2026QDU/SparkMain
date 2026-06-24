@@ -16,20 +16,19 @@
 
 ### 2.3 数据分析模块
 - 基于Spark的数据分析
-- 支持Hive和HBase集成
+- 支持Hive集成
 
 ## 3. 技术选型
 
 - Java 17 (JDK 17)
 - Apache Spark
 - Hive
-- HBase
 - Python (数据清洗脚本)
 
 ## 4. 数据流向
 
 ```
-原始数据 → 数据清洗 → HDFS存储 → Hive/HBase分析 → 结果输出
+原始数据 → 数据清洗 → HDFS存储 → Hive分析 → 结果输出
 ```
 
 ## 5. 部署架构

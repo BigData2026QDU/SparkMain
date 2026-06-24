@@ -7,7 +7,7 @@ SparkMain是一个基于Spark的大数据处理项目，提供完整的数据清
 ## 功能特性
 
 - 自动化数据清洗流水线
-- 支持Hive和HBase集成
+- 支持Hive集成
 - 跨平台支持（Windows和Linux）
 - 完整的文档和规范
 
@@ -16,7 +16,6 @@ SparkMain是一个基于Spark的大数据处理项目，提供完整的数据清
 - JDK 17
 - Apache Spark
 - Hive
-- HBase
 - Python 3.x
 
 ## 快速开始
@@ -34,7 +33,6 @@ git submodule update --init --recursive
 确保以下命令可用：
 - `hive`
 - `hdfs`
-- `hbase`
 - `python3`
 
 ### 3. 运行流水线
