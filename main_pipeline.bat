@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 REM ################################################################################
 REM Big Data Analysis Pipeline Main Script (Windows CMD Version)
-REM Function: Automate data cleaning to Hive/HBase analysis workflow
+REM Function: Automate data cleaning to Hive analysis workflow
 REM ################################################################################
 
 REM ################################################################################
@@ -11,7 +11,6 @@ REM Configuration
 REM ################################################################################
 set HIVE_DB=bigdata_ana
 set HDFS_BASE_PATH=/user/hive/bigdata_ana
-set HBASE_SUFFIX=_hbase
 set PYTHON_CMD=python
 
 REM Directory definitions
@@ -20,7 +19,6 @@ set TRUNCATED_DIR=truncatedDataset
 set CLEANED_DIR=cleanedDataset
 set CLEANPY_DIR=cleanPy
 set INITIALIZE_SQL_DIR=initializeSQL
-set INITIALIZE_HBASE_DIR=initializeHBase
 set PREPARE_DATA_DIR=prepareData
 set JOB_SQL_DIR=jobSQL
 
@@ -38,7 +36,6 @@ REM Environment check
 echo [CHECK] Checking required commands...
 call :check_command hive
 call :check_command hdfs
-call :check_command hbase
 call :check_command %PYTHON_CMD%
 echo [SUCCESS] All commands check passed
 
@@ -176,61 +173,9 @@ if "%need_initialize%"=="true" (
 )
 
 REM ################################################################################
-REM Step 6: Clean HBase tables
+REM Step 6: Run prepareData SQL
 REM ################################################################################
-call :print_step 6 "Clean HBase tables"
-
-for %%f in (%CLEANED_DIR%\*.csv) do (
-    set table_name=%%~nf
-    set hbase_table=!table_name!%HBASE_SUFFIX%
-
-    echo [CHECK] Checking HBase: !hbase_table!
-
-    echo exists '!hbase_table!' | hbase shell -n 2>nul | findstr /c:"does exist" >nul 2>&1
-    if !ERRORLEVEL! EQU 0 (
-        echo [INFO] Deleting HBase table...
-
-        echo disable '!hbase_table!' | hbase shell -n
-        echo drop '!hbase_table!' | hbase shell -n
-        echo [SUCCESS] HBase table deleted
-
-        echo [INFO] Deleting Hive mapping...
-        hive -e "USE %HIVE_DB%; DROP TABLE IF EXISTS !hbase_table!;"
-        echo [SUCCESS] Hive mapping deleted
-    ) else (
-        echo [INFO] Table does not exist, skipping
-    )
-)
-
-REM ################################################################################
-REM Step 7: Run initializeHBase scripts
-REM ################################################################################
-call :print_step 7 "Initialize HBase"
-
-if exist "%INITIALIZE_HBASE_DIR%" (
-    set sh_count=0
-    for %%s in (%INITIALIZE_HBASE_DIR%\*.sh) do (
-        echo [INFO] Executing: %%s
-        bash "%%s"
-        if !ERRORLEVEL! NEQ 0 (
-            echo [ERROR] %%s failed
-            exit /b 1
-        )
-        echo [SUCCESS] %%s executed
-        set /a sh_count+=1
-    )
-
-    if !sh_count! EQU 0 (
-        echo [INFO] No Shell scripts found
-    )
-) else (
-    echo [INFO] Directory not found, skipping
-)
-
-REM ################################################################################
-REM Step 8: Run prepareData SQL
-REM ################################################################################
-call :print_step 8 "Prepare data"
+call :print_step 6 "Prepare data"
 
 if exist "%PREPARE_DATA_DIR%" (
     set sql_count=0
@@ -253,9 +198,9 @@ if exist "%PREPARE_DATA_DIR%" (
 )
 
 REM ################################################################################
-REM Step 9: Run jobSQL
+REM Step 7: Run jobSQL
 REM ################################################################################
-call :print_step 9 "Run analysis tasks"
+call :print_step 7 "Run analysis tasks"
 
 set sql_count=0
 for %%s in (%JOB_SQL_DIR%\*.sql) do (
@@ -274,9 +219,9 @@ if %sql_count% EQU 0 (
 )
 
 REM ################################################################################
-REM Step 10: End
+REM Step 8: End
 REM ################################################################################
-call :print_step 10 "Pipeline completed"
+call :print_step 8 "Pipeline completed"
 
 if exist "print_end.sh" (
     bash print_end.sh

@@ -2,7 +2,7 @@
 
 ################################################################################
 # 大数据分析流水线主脚本
-# 功能：自动化处理从数据清洗到Hive/HBase分析的全流程
+# 功能：自动化处理从数据清洗到Hive分析的全流程
 ################################################################################
 
 set -e  # 任何命令失败立即退出
@@ -12,7 +12,6 @@ set -e  # 任何命令失败立即退出
 ################################################################################
 HIVE_DB="bigdata_ana"
 HDFS_BASE_PATH="/user/hive/bigdata_ana"
-HBASE_SUFFIX="_hbase"
 PYTHON_CMD="python3"
 
 # 目录定义
@@ -21,7 +20,6 @@ TRUNCATED_DIR="truncatedDataset"
 CLEANED_DIR="cleanedDataset"
 CLEANPY_DIR="cleanPy"
 INITIALIZE_SQL_DIR="initializeSQL"
-INITIALIZE_HBASE_DIR="initializeHBase"
 PREPARE_DATA_DIR="prepareData"
 JOB_SQL_DIR="jobSQL"
 
@@ -78,7 +76,6 @@ echo ""
 echo "[检查] 检查必要的命令..."
 check_command hive
 check_command hdfs
-check_command hbase
 check_command $PYTHON_CMD
 echo "[成功] 所有命令检查通过"
 
@@ -237,68 +234,9 @@ else
 fi
 
 ################################################################################
-# 步骤6: 检查并清理HBase表
+# 步骤6: 运行 prepareData 目录下的所有SQL
 ################################################################################
-print_step 6 "检查并清理 HBase 表"
-
-for csv_file in $CLEANED_DIR/*.csv; do
-    if [ -f "$csv_file" ]; then
-        filename=$(basename $csv_file)
-        table_name="${filename%.csv}"
-        hbase_table="${table_name}${HBASE_SUFFIX}"
-
-        echo "[检查] 检查 HBase 表: $hbase_table"
-
-        # 检查HBase表是否存在
-        hbase_exists=$(echo "exists '$hbase_table'" | hbase shell -n 2>/dev/null | grep -c "Table $hbase_table does exist")
-
-        if [ "$hbase_exists" -gt 0 ]; then
-            echo "[信息] HBase 表 '$hbase_table' 存在，正在删除..."
-
-            # 禁用并删除HBase表
-            echo "disable '$hbase_table'" | hbase shell -n
-            echo "drop '$hbase_table'" | hbase shell -n
-            echo "[成功] HBase 表 '$hbase_table' 删除成功"
-
-            # 删除Hive映射表
-            echo "[信息] 检查并删除 Hive 映射表 '$hbase_table'..."
-            hive -e "USE ${HIVE_DB}; DROP TABLE IF EXISTS ${hbase_table};"
-            echo "[成功] Hive 映射表 '$hbase_table' 删除成功"
-        else
-            echo "[信息] HBase 表 '$hbase_table' 不存在，跳过"
-        fi
-    fi
-done
-
-################################################################################
-# 步骤7: 运行 initializeHBase 目录下的所有 Shell 脚本
-################################################################################
-print_step 7 "运行 initializeHBase 目录下的所有 Shell 脚本"
-
-if [ -d "$INITIALIZE_HBASE_DIR" ]; then
-    sh_files=$(find $INITIALIZE_HBASE_DIR -name "*.sh" | sort)
-
-    if [ -z "$sh_files" ]; then
-        echo "[信息] '$INITIALIZE_HBASE_DIR' 目录下没有找到 Shell 脚本，跳过此步骤"
-    else
-        for sh_file in $sh_files; do
-            echo "[信息] 正在执行: $sh_file"
-            bash $sh_file
-            if [ $? -ne 0 ]; then
-                echo "[错误] $sh_file 执行失败"
-                exit 1
-            fi
-            echo "[成功] $sh_file 执行成功"
-        done
-    fi
-else
-    echo "[信息] '$INITIALIZE_HBASE_DIR' 目录不存在，跳过此步骤"
-fi
-
-################################################################################
-# 步骤8: 运行 prepareData 目录下的所有SQL
-################################################################################
-print_step 8 "运行 prepareData 目录下的所有 SQL 脚本"
+print_step 6 "运行 prepareData 目录下的所有 SQL 脚本"
 
 if [ -d "$PREPARE_DATA_DIR" ]; then
     sql_files=$(find $PREPARE_DATA_DIR -name "*.sql" | sort)
@@ -321,9 +259,9 @@ else
 fi
 
 ################################################################################
-# 步骤9: 运行 jobSQL 目录下的所有SQL
+# 步骤7: 运行 jobSQL 目录下的所有SQL
 ################################################################################
-print_step 9 "运行 jobSQL 目录下的所有分析任务"
+print_step 7 "运行 jobSQL 目录下的所有分析任务"
 
 sql_files=$(find $JOB_SQL_DIR -name "*.sql" | sort)
 
@@ -342,9 +280,9 @@ else
 fi
 
 ################################################################################
-# 步骤10: 打印结束标记
+# 步骤8: 打印结束标记
 ################################################################################
-print_step 10 "流水线执行完成"
+print_step 8 "流水线执行完成"
 
 if [ -f "print_end.sh" ]; then
     bash print_end.sh
