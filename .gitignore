@@ -30,7 +30,7 @@ env/
 venv/
 ENV/
 
-# 数据文件（可选）
-# dataset/
-# cleanedDataset/
-# truncatedDataset/
+# 数据文件
+dataset/*.csv
+temp_download/
+output/
