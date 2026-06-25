@@ -13,6 +13,7 @@ SparkMain 是一个基于 Apache Spark 的大数据处理流水线，使用 Movi
 | Hive | 3.1.x | 数据仓库 |
 | Hadoop (HDFS) | - | 分布式文件系统 |
 | Python | 3.8+ | 数据清洗脚本 |
+| Kafka | 3.6+ | 消息队列（实时流处理） |
 
 ## 快速开始
 
@@ -198,34 +199,87 @@ bash test/verify_results.sh
 4. 结果表使用 `taskN_xxx` 命名格式
 5. 本地测试通过后提交
 
+## 实时流处理
+
+本项目支持基于 Kafka + Spark Structured Streaming 的增量数据处理。
+
+### 架构
+
+```
+Kafka Topic (ratings)
+    ↓
+Spark Structured Streaming
+    ↓
+Hive 表 (ratings_streaming)
+```
+
+### 启动服务
+
+```bash
+# 启动 Kafka + Spark Streaming
+chmod +x start_streaming.sh
+./start_streaming.sh
+```
+
+### 生成测试数据
+
+```bash
+# 编译项目
+cd SparkMain
+mvn clean package
+
+# 运行数据生成器
+java -cp target/spark-streaming-kafka-1.0.0.jar org.example.streaming.RatingProducer
+```
+
+### 配置文件
+
+配置文件位于 `config/streaming.properties`：
+
+```properties
+kafka.bootstrap.servers=localhost:9092
+kafka.topic=ratings
+spark.master=local[*]
+streaming.trigger.interval=10 seconds
+```
+
 ## 项目结构
 
 ```
 SparkMain/
 ├── SparkMain/              # 源代码目录
-│   ├── src/                # 源代码
-│   └── test/               # 测试代码
-├── AGENTS/                 # 项目规范（submodule）
-├── dataset/                # 生产数据目录
-├── dataset_test/           # 测试数据目录（轻量级）
-├── cleanPy/                # 生产清洗脚本
-├── cleanPy_test/           # 测试清洗脚本
-├── initializeSQL/          # 生产建表 SQL
-├── initializeSQL_test/     # 测试建表 SQL
-├── prepareData/            # 生产数据准备 SQL
-├── prepareData_test/       # 测试数据准备 SQL
-├── jobSQL/                 # 生产分析任务 SQL
-├── jobSQL_test/            # 测试分析任务 SQL
-├── test/                   # 测试验证脚本
-├── Architecture.md         # 架构文档
-├── README.md               # 项目说明
-├── File_Index.md           # 文件索引
-├── main_pipeline.sh        # 生产流水线脚本（Linux）
-├── main_pipeline.bat       # 生产流水线脚本（Windows）
-├── main_pipeline_test.sh   # 测试流水线脚本（Linux）
-├── main_pipeline_test.bat  # 测试流水线脚本（Windows）
-├── truncate_file.py        # 数据截断工具
-└── .gitignore              # Git 忽略配置
+│   ├── src/
+│   │   └── main/
+│   │       └── java/
+│   │           └── org/example/streaming/
+│   │               ├── RatingStreamProcessor.java  # Spark Streaming 处理器
+│   │               └── RatingProducer.java          # Kafka 数据生成器
+│   ├── pom.xml            # Maven 配置
+│   └── test/
+├── config/                # 配置文件
+│   └── streaming.properties
+├── AGENTS/                # 项目规范（submodule）
+├── dataset/               # 生产数据目录
+├── dataset_test/          # 测试数据目录（轻量级）
+├── cleanPy/               # 生产清洗脚本
+├── cleanPy_test/          # 测试清洗脚本
+├── initializeSQL/         # 生产建表 SQL
+├── initializeSQL_test/    # 测试建表 SQL
+├── prepareData/           # 生产数据准备 SQL
+├── prepareData_test/      # 测试数据准备 SQL
+├── jobSQL/                # 生产分析任务 SQL
+├── jobSQL_test/           # 测试分析任务 SQL
+├── test/                  # 测试验证脚本
+├── start_streaming.sh     # 启动 Kafka + Spark Streaming
+├── Architecture.md        # 架构文档
+├── README.md              # 项目说明
+├── File_Index.md          # 文件索引
+├── main_pipeline.sh       # 生产流水线脚本（Linux）
+├── main_pipeline.bat      # 生产流水线脚本（Windows）
+├── main_pipeline_test.sh  # 测试流水线脚本（Linux）
+├── main_pipeline_test.bat # 测试流水线脚本（Windows）
+├── truncate_file.py       # 数据截断工具
+└── .gitignore             # Git 忽略配置
 ```
 
 ## 贡献指南
