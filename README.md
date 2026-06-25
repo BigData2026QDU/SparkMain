@@ -36,15 +36,30 @@ python dataset/download_movielens.py
 
 ### 3. 运行流水线
 
-**Linux/Mac：**
+**生产模式：**
+
+Linux/Mac：
 ```bash
 chmod +x main_pipeline.sh
 ./main_pipeline.sh
 ```
 
-**Windows：**
+Windows：
 ```cmd
 main_pipeline.bat
+```
+
+**测试模式：**
+
+Linux/Mac：
+```bash
+chmod +x main_pipeline_test.sh
+./main_pipeline_test.sh
+```
+
+Windows：
+```cmd
+main_pipeline_test.bat
 ```
 
 ## 流水线说明
@@ -68,16 +83,24 @@ main_pipeline.bat
 
 ```
 SparkMain/
-├── dataset/            # 原始数据（MovieLens CSV 文件）
+├── dataset/            # 生产数据（MovieLens CSV 文件）
+├── dataset_test/       # 测试数据（轻量级，10-100KB）
 ├── truncatedDataset/   # 截断后的数据（自动生成）
 ├── cleanedDataset/     # 清洗后的数据（自动生成）
-├── cleanPy/            # Python 清洗脚本
-├── initializeSQL/      # Hive 建表 SQL
-├── prepareData/        # 数据准备 SQL（创建视图等）
-├── jobSQL/             # 分析任务 SQL
-├── main_pipeline.sh    # Linux 流水线脚本
-├── main_pipeline.bat   # Windows 流水线脚本
-└── truncate_file.py    # 大文件截断工具
+├── cleanPy/            # 生产清洗脚本
+├── cleanPy_test/       # 测试清洗脚本
+├── initializeSQL/      # 生产建表 SQL
+├── initializeSQL_test/ # 测试建表 SQL
+├── prepareData/        # 生产数据准备 SQL
+├── prepareData_test/   # 测试数据准备 SQL
+├── jobSQL/             # 生产分析任务 SQL
+├── jobSQL_test/        # 测试分析任务 SQL
+├── main_pipeline.sh    # 生产流水线脚本（Linux）
+├── main_pipeline.bat   # 生产流水线脚本（Windows）
+├── main_pipeline_test.sh  # 测试流水线脚本（Linux）
+├── main_pipeline_test.bat # 测试流水线脚本（Windows）
+├── truncate_file.py    # 大文件截断工具
+└── test/               # 测试验证脚本
 ```
 
 ## 如何编写新任务
@@ -120,6 +143,40 @@ SparkMain/
    SELECT * FROM taskN_xxx LIMIT 20;
    ```
 
+### 测试模式
+
+本项目支持测试模式，使用轻量级测试数据（10-100KB）快速验证流水线。
+
+**测试目录结构：**
+
+| 生产目录 | 测试目录 | 说明 |
+|---------|---------|------|
+| `dataset/` | `dataset_test/` | 测试数据 |
+| `cleanPy/` | `cleanPy_test/` | 测试清洗脚本 |
+| `initializeSQL/` | `initializeSQL_test/` | 测试建表 SQL |
+| `prepareData/` | `prepareData_test/` | 测试数据准备 SQL |
+| `jobSQL/` | `jobSQL_test/` | 测试分析任务 SQL |
+
+**编写测试任务：**
+
+1. 在 `jobSQL_test/` 目录下创建测试 SQL 文件
+2. 使用 `bigdata_ana_test` 数据库
+3. 运行测试流水线验证：
+
+```bash
+# Linux/Mac
+./main_pipeline_test.sh
+
+# Windows
+main_pipeline_test.bat
+```
+
+4. 运行验证脚本检查结果：
+
+```bash
+bash test/verify_results.sh
+```
+
 ### 可用数据表
 
 流水线初始化后，`bigdata_ana` 数据库中包含以下表：
@@ -149,16 +206,24 @@ SparkMain/
 │   ├── src/                # 源代码
 │   └── test/               # 测试代码
 ├── AGENTS/                 # 项目规范（submodule）
-├── dataset/                # 原始数据目录
-├── cleanPy/                # Python 清洗脚本
-├── initializeSQL/          # Hive 建表 SQL
-├── prepareData/            # 数据准备 SQL
-├── jobSQL/                 # 分析任务 SQL
+├── dataset/                # 生产数据目录
+├── dataset_test/           # 测试数据目录（轻量级）
+├── cleanPy/                # 生产清洗脚本
+├── cleanPy_test/           # 测试清洗脚本
+├── initializeSQL/          # 生产建表 SQL
+├── initializeSQL_test/     # 测试建表 SQL
+├── prepareData/            # 生产数据准备 SQL
+├── prepareData_test/       # 测试数据准备 SQL
+├── jobSQL/                 # 生产分析任务 SQL
+├── jobSQL_test/            # 测试分析任务 SQL
+├── test/                   # 测试验证脚本
 ├── Architecture.md         # 架构文档
 ├── README.md               # 项目说明
 ├── File_Index.md           # 文件索引
-├── main_pipeline.sh        # Linux 流水线脚本
-├── main_pipeline.bat       # Windows 流水线脚本
+├── main_pipeline.sh        # 生产流水线脚本（Linux）
+├── main_pipeline.bat       # 生产流水线脚本（Windows）
+├── main_pipeline_test.sh   # 测试流水线脚本（Linux）
+├── main_pipeline_test.bat  # 测试流水线脚本（Windows）
 ├── truncate_file.py        # 数据截断工具
 └── .gitignore              # Git 忽略配置
 ```
