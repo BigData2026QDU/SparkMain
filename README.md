@@ -2,53 +2,17 @@
 
 ## 简介
 
-SparkMain是一个基于Spark的大数据处理项目，使用MovieLens电影评分数据集进行分析。
-
-## 功能特性
-
-- 自动化数据清洗流水线
-- 支持Hive集成
-- 跨平台支持（Windows和Linux）
-- 5个不同的Spark分析任务
+SparkMain 是一个基于 Apache Spark 的大数据处理流水线，使用 MovieLens 电影评分数据集进行分析。本项目提供自动化数据清洗、Hive 建表、数据加载和分析任务执行的完整流程。
 
 ## 环境要求
 
-- JDK 17
-- Apache Spark
-- Hive
-- Python 3.x
-
-## 数据集
-
-使用MovieLens 25M数据集：
-- `movies.csv` - 电影信息（movieId, title, genres）
-- `ratings.csv` - 评分数据（userId, movieId, rating, timestamp）
-- `tags.csv` - 标签数据（userId, movieId, tag, timestamp）
-- `links.csv` - 链接数据（movieId, imdbId, tmdbId）
-
-下载地址：https://grouplens.org/datasets/movielens/25m/
-
-## Spark分析任务
-
-### 任务1: 基础聚合分析
-- 统计每部电影的平均评分、评分次数、最高分、最低分
-- 使用GROUP BY和聚合函数
-
-### 任务2: 窗口函数分析
-- 计算电影在各类型中的排名、评分百分位
-- 使用ROW_NUMBER, RANK, PERCENT_RANK
-
-### 任务3: 类型分析
-- 分析各类型的电影数量、平均评分、最受欢迎类型
-- 使用LATERAL VIEW和字符串处理
-
-### 任务4: 时间分析
-- 分析评分的时间分布、年度趋势、活跃时段
-- 使用日期函数和时间窗口分析
-
-### 任务5: 用户行为分析
-- 分析用户评分行为、活跃度、偏好类型
-- 使用复杂子查询和用户画像分析
+| 组件 | 版本 | 说明 |
+|------|------|------|
+| JDK | 17 | Java 开发工具包 |
+| Apache Spark | 3.5.0 | 大数据处理框架 |
+| Hive | 3.1.x | 数据仓库 |
+| Hadoop (HDFS) | - | 分布式文件系统 |
+| Python | 3.8+ | 数据清洗脚本 |
 
 ## 快速开始
 
@@ -62,27 +26,120 @@ git submodule update --init --recursive
 
 ### 2. 下载数据集
 
-从 https://grouplens.org/datasets/movielens/25m/ 下载数据集，将CSV文件放入 `dataset/` 目录。
+从 [MovieLens 25M](https://grouplens.org/datasets/movielens/25m/) 下载数据集，将 CSV 文件放入 `dataset/` 目录。
 
-### 3. 配置环境
+或使用内置下载脚本：
 
-确保以下命令可用：
-- `hive`
-- `hdfs`
-- `python3`
+```bash
+python dataset/download_movielens.py
+```
 
-### 4. 运行流水线
+### 3. 运行流水线
 
-**Linux/Mac:**
+**Linux/Mac：**
 ```bash
 chmod +x main_pipeline.sh
 ./main_pipeline.sh
 ```
 
-**Windows:**
+**Windows：**
 ```cmd
 main_pipeline.bat
 ```
+
+## 流水线说明
+
+### 执行流程
+
+流水线自动执行以下 8 个步骤：
+
+| 步骤 | 操作 | 说明 |
+|------|------|------|
+| 1 | 检查/创建 Hive 数据库 | 数据库 `bigdata_ana` 不存在则自动创建 |
+| 2 | 截断大文件 | `truncate_file.py` 将 CSV 截断至 300MB |
+| 3 | 运行清洗脚本 | 执行 `cleanPy/` 目录下所有 Python 脚本 |
+| 4 | 上传至 HDFS | 清理旧数据并上传清洗后的 CSV |
+| 5 | 初始化 Hive 表 | 检查表是否存在，不存在则执行 `initializeSQL/` |
+| 6 | 数据准备 | 执行 `prepareData/` 中的 SQL（创建视图等） |
+| 7 | 执行分析任务 | 执行 `jobSQL/` 目录下所有 SQL 文件 |
+| 8 | 完成标记 | 打印流水线执行完成信息 |
+
+### 目录结构
+
+```
+SparkMain/
+├── dataset/            # 原始数据（MovieLens CSV 文件）
+├── truncatedDataset/   # 截断后的数据（自动生成）
+├── cleanedDataset/     # 清洗后的数据（自动生成）
+├── cleanPy/            # Python 清洗脚本
+├── initializeSQL/      # Hive 建表 SQL
+├── prepareData/        # 数据准备 SQL（创建视图等）
+├── jobSQL/             # 分析任务 SQL
+├── main_pipeline.sh    # Linux 流水线脚本
+├── main_pipeline.bat   # Windows 流水线脚本
+└── truncate_file.py    # 大文件截断工具
+```
+
+## 如何编写新任务
+
+### 任务规范
+
+在 `jobSQL/` 目录下创建 SQL 文件，遵循以下规范：
+
+1. **文件命名：** `XX_任务名称简述.sql`（XX 为两位数字编号，决定执行顺序）
+   - 示例：`06_task6_hot_movies.sql`
+
+2. **SQL 文件必须包含：**
+   ```sql
+   SET hive.execution.engine=spark;
+   SET spark.master=local[*];
+   
+   USE bigdata_ana;
+   ```
+
+3. **结果表命名：** `taskN_xxx`（N 为任务编号）
+   - 示例：`task6_hot_movies`
+
+4. **SQL 模式：**
+   ```sql
+   SET hive.execution.engine=spark;
+   SET spark.master=local[*];
+   
+   USE bigdata_ana;
+   
+   -- 删除旧结果表（如存在）
+   DROP TABLE IF EXISTS taskN_xxx;
+   
+   -- 创建结果表
+   CREATE TABLE taskN_xxx AS
+   SELECT ...
+   FROM ...
+   WHERE ...;
+   
+   -- 展示结果
+   SELECT * FROM taskN_xxx LIMIT 20;
+   ```
+
+### 可用数据表
+
+流水线初始化后，`bigdata_ana` 数据库中包含以下表：
+
+| 表名 | 字段 | 说明 |
+|------|------|------|
+| `movies` | movieId, title, genres | 电影信息 |
+| `ratings` | userId, movieId, rating, timestamp | 评分数据 |
+| `tags` | userId, movieId, tag, timestamp | 标签数据 |
+| `links` | movieId, imdbId, tmdbId | 外部链接 |
+
+流水线还会创建临时视图 `v_movies_ratings`（JOIN movies 和 ratings）。
+
+### 提交要求
+
+1. SQL 文件放在 `jobSQL/` 目录
+2. 遵循文件命名规范（`XX_taskname.sql`）
+3. 文件开头包含 Spark 引擎设置和 `USE bigdata_ana`
+4. 结果表使用 `taskN_xxx` 命名格式
+5. 本地测试通过后提交
 
 ## 项目结构
 
@@ -93,31 +150,26 @@ SparkMain/
 │   └── test/               # 测试代码
 ├── AGENTS/                 # 项目规范（submodule）
 ├── dataset/                # 原始数据目录
-├── cleanPy/                # Python清洗脚本
-├── initializeSQL/          # Hive建表SQL
-├── prepareData/            # 数据准备SQL
-├── jobSQL/                 # 分析任务SQL
+├── cleanPy/                # Python 清洗脚本
+├── initializeSQL/          # Hive 建表 SQL
+├── prepareData/            # 数据准备 SQL
+├── jobSQL/                 # 分析任务 SQL
 ├── Architecture.md         # 架构文档
 ├── README.md               # 项目说明
 ├── File_Index.md           # 文件索引
-├── main_pipeline.sh        # Linux流水线脚本
-├── main_pipeline.bat       # Windows流水线脚本
+├── main_pipeline.sh        # Linux 流水线脚本
+├── main_pipeline.bat       # Windows 流水线脚本
 ├── truncate_file.py        # 数据截断工具
-└── .gitignore              # Git忽略配置
+└── .gitignore              # Git 忽略配置
 ```
-
-## 开发指南
-
-1. 遵循AGENTS仓库中的规范文档
-2. 代码变更时同步更新文档
-3. 提交前检查规范遵守情况
 
 ## 贡献指南
 
 1. Fork 本仓库
-2. 新建 Feat_xxx 分支
-3. 提交代码
-4. 新建 Pull Request
+2. 新建 `feature/xxx` 或 `hotfix/xxx` 分支
+3. 按照「如何编写新任务」规范添加 SQL 文件
+4. 本地测试流水线执行通过
+5. 提交代码并创建 Pull Request
 
 ## 许可证
 
