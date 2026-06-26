@@ -53,15 +53,24 @@ object SmokeTest {
   // ---- Spark 初始化 ----
 
   private def initSpark(repoRoot: Path): SparkSession = {
+    val warehouseDir = repoRoot.resolve("spark-warehouse-ci")
+    // Spark/Hive 需要 warehouse 目录物理存在
+    Files.createDirectories(warehouseDir)
+    val warehouseUri = s"file://${warehouseDir.toString.replace('\\', '/')}"
+
     val spark = SparkSession.builder()
       .appName("LuckyAnJun-SmokeTest")
       .master("local[2]")
       .config("spark.sql.adaptive.enabled", "false")
-      .config("spark.sql.warehouse.dir", repoRoot.resolve("spark-warehouse-ci").toString)
+      .config("spark.sql.warehouse.dir", warehouseUri)
+      .config("spark.hadoop.hive.metastore.warehouse.dir", warehouseUri)
       .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
       .enableHiveSupport()
       .getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
+    // 二次确认 Hive warehouse 目录
+    spark.sparkContext.hadoopConfiguration.set("hive.metastore.warehouse.dir", warehouseUri)
+    spark.sql(s"SET hive.metastore.warehouse.dir=$warehouseUri")
     spark.sql("CREATE DATABASE IF NOT EXISTS bigdata_ana_test")
     spark.sql("USE bigdata_ana_test")
     println("[INFO] Spark session started (local[2], Hive enabled)")

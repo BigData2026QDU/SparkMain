@@ -85,6 +85,8 @@ jobs:
 
       - name: Run Spark SQL smoke test via spark-submit
         run: |
+          sudo mkdir -p /user/hive
+          sudo chown -R runner:runner /user/hive
           spark-submit \
             --class org.example.ci.SmokeTest \
             --master "local[2]" \
