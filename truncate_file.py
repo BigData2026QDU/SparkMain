@@ -7,7 +7,7 @@ import os
 import shutil
 import sys
 
-DEFAULT_TARGET_SIZE_MB = 300
+DEFAULT_TARGET_SIZE_MB = 200
 
 
 def truncate_file(input_file, output_file, target_size_mb=DEFAULT_TARGET_SIZE_MB):

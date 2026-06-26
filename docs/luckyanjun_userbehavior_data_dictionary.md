@@ -5,7 +5,7 @@
 - 任务来源：GitHub issue #14 `[LuckyAnJun][个人独立分析] 数据集抽样、清洗与数据字典`
 - 个人任务：LuckyAnJun 独立 Spark 分析任务，不覆盖其他组员工作
 - 原始文件：`dataset/UserBehavior.csv`
-- 生产抽样：流水线先使用 `truncate_file.py` 按行截取约 300 MB 原始 CSV 到 `truncatedDataset/UserBehavior.csv`，再清洗输出 `cleanedDataset/user_behavior.csv`
+- 生产抽样：流水线先使用 `truncate_file.py` 按行截取约 200 MB 原始 CSV 到 `truncatedDataset/UserBehavior.csv`，再清洗输出 `cleanedDataset/user_behavior.csv`
 - 验收规模：生产清洗结果必须不少于 15000 行，且输出 CSV 不超过 500 MB
 - 分析边界：该数据没有价格、订单号、商品名称、用户性别、年龄、城市等字段，因此不做 GMV、销售额、利润、客单价或用户画像分析
 

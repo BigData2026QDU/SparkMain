@@ -80,7 +80,7 @@ else
 fi
 
 print_step 2 "Truncate source CSV files"
-"$PYTHON_CMD" truncate_file.py --dataset-dir "$DATASET_DIR" --output-dir "$TRUNCATED_DIR" --size 300
+"$PYTHON_CMD" truncate_file.py --dataset-dir "$DATASET_DIR" --output-dir "$TRUNCATED_DIR" --size 200
 
 print_step 3 "Run Python cleaning scripts"
 rm -rf "$CLEANED_DIR"

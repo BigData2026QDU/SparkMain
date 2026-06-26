@@ -12,7 +12,7 @@ bash main_pipeline.sh
 
 流水线会依次执行：
 
-- `truncate_file.py`：按行截取约 300 MB 原始 CSV 到 `truncatedDataset/`，作为 issue #14 的生产抽样策略。
+- `truncate_file.py`：按行截取约 200 MB 原始 CSV 到 `truncatedDataset/`，作为 issue #14 的生产抽样策略。
 - `cleanPy/clean_user_behavior.py`：过滤异常记录，派生时间字段，输出 `cleanedDataset/user_behavior.csv`。
 - HDFS 上传：按 CSV 文件名创建表目录，例如 `/user/hive/bigdata_ana/user_behavior/`。
 - `initializeSQL/01_create_tables.sql`：创建 Hive 外部表 `user_behavior`。
