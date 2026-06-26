@@ -1,8 +1,8 @@
--- LuckyAnJun offline analysis 4: user segmentation, retention and short-term repurchase.
+-- LuckyAnJun test analysis 4: user segmentation, retention and short-term repurchase.
 SET hive.execution.engine=spark;
 SET spark.master=local[*];
 
-USE bigdata_ana;
+USE bigdata_ana_test;
 
 DROP TABLE IF EXISTS lb_user_features;
 CREATE TABLE lb_user_features AS
