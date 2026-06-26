@@ -30,6 +30,11 @@ env/
 venv/
 ENV/
 
+# CI/Spark 临时文件
+spark-warehouse-ci/
+metastore_db/
+derby.log
+
 # 数据文件
 dataset/*.csv
 temp_download/
