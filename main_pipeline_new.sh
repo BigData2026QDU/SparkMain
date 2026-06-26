@@ -156,6 +156,30 @@ if [ $? -ne 0 ]; then
 fi
 echo "[成功] 类型分析完成"
 
+echo "[信息] 运行时间分析..."
+spark-submit \
+    --class org.example.analysis.AnalyzeTime \
+    --master $SPARK_MASTER \
+    $JAR_PATH
+
+if [ $? -ne 0 ]; then
+    echo "[错误] 时间分析失败"
+    exit 1
+fi
+echo "[成功] 时间分析完成"
+
+echo "[信息] 运行用户行为分析..."
+spark-submit \
+    --class org.example.analysis.AnalyzeUsers \
+    --master $SPARK_MASTER \
+    $JAR_PATH
+
+if [ $? -ne 0 ]; then
+    echo "[错误] 用户行为分析失败"
+    exit 1
+fi
+echo "[成功] 用户行为分析完成"
+
 ################################################################################
 # 步骤4: 打印结束标记
 ################################################################################

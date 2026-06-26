@@ -1,7 +1,7 @@
 package org.example
 
 import org.example.streaming.RatingStreamProcessor
-import org.example.analysis.{AnalyzeRatings, AnalyzeGenres}
+import org.example.analysis.{AnalyzeRatings, AnalyzeGenres, AnalyzeTime, AnalyzeUsers}
 
 /**
  * 主入口
@@ -16,6 +16,8 @@ object Main {
       println("  stream    - 启动评分数据流处理")
       println("  analyze   - 运行评分分析")
       println("  genres    - 运行类型分析")
+      println("  time      - 运行时间分析")
+      println("  users     - 运行用户行为分析")
       return
     }
 
@@ -23,6 +25,8 @@ object Main {
       case "stream" => RatingStreamProcessor.main(args.drop(1))
       case "analyze" => AnalyzeRatings.main(args.drop(1))
       case "genres" => AnalyzeGenres.main(args.drop(1))
+      case "time" => AnalyzeTime.main(args.drop(1))
+      case "users" => AnalyzeUsers.main(args.drop(1))
       case _ => println(s"未知任务: ${args(0)}")
     }
   }
