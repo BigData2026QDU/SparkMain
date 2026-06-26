@@ -4,7 +4,7 @@
 
 import csv
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 INPUT_FILE = os.path.join("dataset_test", "UserBehavior.csv")
 OUTPUT_DIR = "cleanedDataset_test"
@@ -21,11 +21,12 @@ HEADER = [
     "event_hour",
     "weekday",
 ]
+CHINA_TZ = timezone(timedelta(hours=8))
 
 
 def clean_user_behavior():
     if not os.path.exists(INPUT_FILE):
-        print(f"跳过用户行为数据清洗: {INPUT_FILE} 不存在")
+        print(f"[SKIP] UserBehavior test file not found: {INPUT_FILE}")
         return
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -49,16 +50,22 @@ def clean_user_behavior():
                 user_id = int(row[0])
                 item_id = int(row[1])
                 category_id = int(row[2])
-                behavior_type = row[3].strip()
+                behavior_type = row[3].strip().lower()
                 event_ts = int(row[4])
-                if behavior_type not in VALID_BEHAVIORS or event_ts <= 0:
+                if (
+                    user_id <= 0
+                    or item_id <= 0
+                    or category_id <= 0
+                    or behavior_type not in VALID_BEHAVIORS
+                    or event_ts <= 0
+                ):
                     skipped += 1
                     continue
             except ValueError:
                 skipped += 1
                 continue
 
-            event_dt = datetime.fromtimestamp(event_ts)
+            event_dt = datetime.fromtimestamp(event_ts, CHINA_TZ).replace(tzinfo=None)
             writer.writerow(
                 [
                     user_id,
@@ -74,10 +81,10 @@ def clean_user_behavior():
             )
             valid += 1
 
-    print("用户行为数据清洗完成:")
-    print(f"  总行数: {total}")
-    print(f"  有效行数: {valid}")
-    print(f"  跳过行数: {skipped}")
+    print("[SUCCESS] UserBehavior test cleaning completed")
+    print(f"  total_rows: {total}")
+    print(f"  valid_rows: {valid}")
+    print(f"  skipped_rows: {skipped}")
 
 
 if __name__ == "__main__":

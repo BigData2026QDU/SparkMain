@@ -1,268 +1,133 @@
 #!/bin/bash
+set -euo pipefail
 
-################################################################################
-# 大数据分析流水线测试脚本
-# 功能：使用轻量级测试数据运行流水线
-################################################################################
-
-set -e  # 任何命令失败立即退出
-
-################################################################################
-# 配置项
-################################################################################
 HIVE_DB="bigdata_ana_test"
 HDFS_BASE_PATH="/user/hive/bigdata_ana_test"
-PYTHON_CMD="python3"
+PYTHON_CMD="${PYTHON_CMD:-python3}"
 
-# 目录定义（测试版本）
 DATASET_DIR="dataset_test"
-TRUNCATED_DIR="truncatedDataset_test"
 CLEANED_DIR="cleanedDataset_test"
 CLEANPY_DIR="cleanPy_test"
 INITIALIZE_SQL_DIR="initializeSQL_test"
 PREPARE_DATA_DIR="prepareData_test"
 JOB_SQL_DIR="jobSQL_test"
 
-################################################################################
-# 工具函数
-################################################################################
-
-print_separator() {
+print_step() {
+    echo ""
+    echo "================================================================================"
+    echo "Step $1: $2"
     echo "================================================================================"
 }
 
-print_step() {
-    local step_num=$1
-    local step_desc=$2
-    echo ""
-    print_separator
-    echo "步骤 $step_num: $step_desc"
-    print_separator
-}
-
 check_command() {
-    local cmd=$1
-    if ! command -v $cmd &> /dev/null; then
-        echo "[错误] 命令 '$cmd' 未找到，请先安装并配置环境变量"
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "[ERROR] Command not found: $1"
         exit 1
     fi
 }
 
 check_directory() {
-    local dir=$1
-    if [ ! -d "$dir" ]; then
-        echo "[错误] 目录 '$dir' 不存在"
+    if [ ! -d "$1" ]; then
+        echo "[ERROR] Directory not found: $1"
         exit 1
     fi
 }
 
-################################################################################
-# 主流程
-################################################################################
+upload_csv() {
+    local csv_file="$1"
+    local filename
+    local table_name
+    filename="$(basename "$csv_file")"
+    table_name="${filename%.csv}"
 
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║                                                                   ║"
-echo "║                   大数据分析流水线（测试模式）                    ║"
-echo "║                                                                   ║"
-echo "╚═══════════════════════════════════════════════════════════════════╝"
-echo ""
+    echo "[INFO] Uploading $filename to ${HDFS_BASE_PATH}/${table_name}/"
+    hdfs dfs -mkdir -p "${HDFS_BASE_PATH}/${table_name}"
+    hdfs dfs -put -f "$csv_file" "${HDFS_BASE_PATH}/${table_name}/"
+    hdfs dfs -test -e "${HDFS_BASE_PATH}/${table_name}/${filename}"
+}
 
-# 环境检查
-echo "[检查] 检查必要的命令..."
+run_sql_dir() {
+    local sql_dir="$1"
+    if [ ! -d "$sql_dir" ]; then
+        echo "[INFO] SQL directory not found, skipping: $sql_dir"
+        return
+    fi
+
+    while IFS= read -r sql_file; do
+        [ -n "$sql_file" ] || continue
+        echo "[INFO] Running SQL: $sql_file"
+        hive -f "$sql_file"
+    done < <(find "$sql_dir" -name "*.sql" | sort)
+}
+
+echo "[INFO] Starting SparkMain test pipeline"
+
 check_command hive
 check_command hdfs
-check_command $PYTHON_CMD
-echo "[成功] 所有命令检查通过"
+check_command "$PYTHON_CMD"
+check_directory "$DATASET_DIR"
+check_directory "$CLEANPY_DIR"
+check_directory "$INITIALIZE_SQL_DIR"
+check_directory "$JOB_SQL_DIR"
 
-echo "[检查] 检查必要的目录..."
-check_directory $DATASET_DIR
-check_directory $CLEANPY_DIR
-check_directory $INITIALIZE_SQL_DIR
-check_directory $JOB_SQL_DIR
-echo "[成功] 所有目录检查通过"
-
-################################################################################
-# 步骤1: 检查/创建Hive数据库
-################################################################################
-print_step 1 "检查/创建 Hive 数据库 '$HIVE_DB'"
-
+print_step 1 "Create Hive test database if needed"
 if hive -e "SHOW DATABASES;" | grep -q "^${HIVE_DB}$"; then
-    echo "[信息] 数据库 '$HIVE_DB' 已存在"
+    echo "[INFO] Database exists: $HIVE_DB"
 else
-    echo "[信息] 数据库 '$HIVE_DB' 不存在，正在创建..."
     hive -e "CREATE DATABASE ${HIVE_DB};"
-    echo "[成功] 数据库 '$HIVE_DB' 创建成功"
+    echo "[SUCCESS] Database created: $HIVE_DB"
 fi
 
-################################################################################
-# 步骤2: 运行 truncate_file.py（测试模式跳过）
-################################################################################
-print_step 2 "跳过 truncate_file.py（测试数据已足够小）"
+print_step 2 "Skip truncation for lightweight test data"
+echo "[INFO] Test data is already small"
 
-################################################################################
-# 步骤3: 运行 cleanPy_test 目录下的所有 Python 脚本
-################################################################################
-print_step 3 "运行 cleanPy_test 目录下的所有清洗脚本"
+print_step 3 "Run Python test cleaning scripts"
+rm -rf "$CLEANED_DIR"
+mkdir -p "$CLEANED_DIR"
+while IFS= read -r py_file; do
+    [ -n "$py_file" ] || continue
+    echo "[INFO] Running cleaner: $py_file"
+    "$PYTHON_CMD" "$py_file"
+done < <(find "$CLEANPY_DIR" -name "*.py" | sort)
 
-echo "[信息] 清空 '$CLEANED_DIR' 目录..."
-rm -rf $CLEANED_DIR/*
-mkdir -p $CLEANED_DIR
+print_step 4 "Upload test CSV files to HDFS"
+hdfs dfs -rm -r -f "${HDFS_BASE_PATH:?}/"* 2>/dev/null || true
+hdfs dfs -mkdir -p "$HDFS_BASE_PATH"
 
-py_files=$(find $CLEANPY_DIR -name "*.py" | sort)
+uploaded_count=0
+while IFS= read -r csv_file; do
+    [ -n "$csv_file" ] || continue
+    upload_csv "$csv_file"
+    uploaded_count=$((uploaded_count + 1))
+done < <(find "$CLEANED_DIR" -name "*.csv" | sort)
 
-if [ -z "$py_files" ]; then
-    echo "[警告] '$CLEANPY_DIR' 目录下没有找到 Python 脚本"
-else
-    for py_file in $py_files; do
-        echo "[信息] 正在执行: $py_file"
-        $PYTHON_CMD $py_file
-        if [ $? -ne 0 ]; then
-            echo "[错误] $py_file 执行失败"
-            exit 1
-        fi
-        echo "[成功] $py_file 执行成功"
-    done
-fi
-
-################################################################################
-# 步骤4: 清理HDFS旧文件并上传新文件
-################################################################################
-print_step 4 "清理 HDFS 并上传清洗后的数据"
-
-echo "[信息] 清理 HDFS 路径: $HDFS_BASE_PATH"
-hdfs dfs -rm -r -f $HDFS_BASE_PATH/* 2>/dev/null || true
-
-hdfs dfs -mkdir -p $HDFS_BASE_PATH
-
-upload_dir="$CLEANED_DIR"
-csv_files=$(find $upload_dir -name "*.csv")
-if [ -z "$csv_files" ]; then
-    upload_dir="$DATASET_DIR"
-    csv_files=$(find $upload_dir -name "*.csv")
-fi
-
-for csv_file in $csv_files; do
-    filename=$(basename $csv_file)
-    table_name="${filename%.csv}"
-    echo "[信息] 正在上传: $filename -> $table_name"
-    hdfs dfs -mkdir -p $HDFS_BASE_PATH/$table_name
-    hdfs dfs -put -f $csv_file $HDFS_BASE_PATH/$table_name/
-
-    if hdfs dfs -test -e $HDFS_BASE_PATH/$table_name/$filename; then
-        echo "[成功] $filename 上传成功"
-    else
-        echo "[错误] $filename 上传失败"
-        exit 1
+while IFS= read -r csv_file; do
+    [ -n "$csv_file" ] || continue
+    filename="$(basename "$csv_file")"
+    if [ "$filename" = "UserBehavior.csv" ] && [ -f "$CLEANED_DIR/user_behavior.csv" ]; then
+        continue
     fi
-done
-
-echo "[信息] 验证HDFS文件数量..."
-hdfs_count=$(hdfs dfs -ls $HDFS_BASE_PATH/*/*.csv 2>/dev/null | wc -l)
-echo "[信息] HDFS文件数: $hdfs_count"
-
-################################################################################
-# 步骤5: 检查Hive表是否存在，决定是否初始化
-################################################################################
-print_step 5 "检查 Hive 表并决定是否执行初始化"
-
-need_initialize=false
-
-for csv_file in $upload_dir/*.csv; do
-    if [ -f "$csv_file" ]; then
-        filename=$(basename $csv_file)
-        table_name="${filename%.csv}"
-
-        echo "[检查] 检查表: $table_name"
-
-        if hive -e "USE ${HIVE_DB}; SHOW TABLES;" | grep -q "^${table_name}$"; then
-            echo "[信息] 表 '$table_name' 已存在"
-        else
-            echo "[信息] 表 '$table_name' 不存在"
-            need_initialize=true
-        fi
+    if [ -f "$CLEANED_DIR/$filename" ]; then
+        continue
     fi
-done
+    upload_csv "$csv_file"
+    uploaded_count=$((uploaded_count + 1))
+done < <(find "$DATASET_DIR" -name "*.csv" | sort)
 
-if [ "$need_initialize" = true ]; then
-    echo "[信息] 检测到缺失的表，开始执行所有初始化SQL..."
-
-    sql_files=$(find $INITIALIZE_SQL_DIR -name "*.sql" | sort)
-
-    if [ -z "$sql_files" ]; then
-        echo "[警告] '$INITIALIZE_SQL_DIR' 目录下没有找到 SQL 文件"
-    else
-        for sql_file in $sql_files; do
-            echo "[信息] 正在执行: $sql_file"
-            hive -f $sql_file
-            if [ $? -ne 0 ]; then
-                echo "[错误] $sql_file 执行失败"
-                exit 1
-            fi
-            echo "[成功] $sql_file 执行成功"
-        done
-    fi
-else
-    echo "[信息] 所有表都已存在，跳过初始化"
+if [ "$uploaded_count" -eq 0 ]; then
+    echo "[ERROR] No CSV files were uploaded"
+    exit 1
 fi
+echo "[SUCCESS] Uploaded CSV files: $uploaded_count"
 
-################################################################################
-# 步骤6: 运行 prepareData_test 目录下的所有SQL
-################################################################################
-print_step 6 "运行 prepareData_test 目录下的所有 SQL 脚本"
+print_step 5 "Initialize Hive test tables"
+run_sql_dir "$INITIALIZE_SQL_DIR"
 
-if [ -d "$PREPARE_DATA_DIR" ]; then
-    sql_files=$(find $PREPARE_DATA_DIR -name "*.sql" | sort)
+print_step 6 "Prepare test DWD tables and views"
+run_sql_dir "$PREPARE_DATA_DIR"
 
-    if [ -z "$sql_files" ]; then
-        echo "[信息] '$PREPARE_DATA_DIR' 目录下没有找到 SQL 文件，跳过此步骤"
-    else
-        for sql_file in $sql_files; do
-            echo "[信息] 正在执行: $sql_file"
-            hive -f $sql_file
-            if [ $? -ne 0 ]; then
-                echo "[错误] $sql_file 执行失败"
-                exit 1
-            fi
-            echo "[成功] $sql_file 执行成功"
-        done
-    fi
-else
-    echo "[信息] '$PREPARE_DATA_DIR' 目录不存在，跳过此步骤"
-fi
+print_step 7 "Run test analysis SQL jobs"
+run_sql_dir "$JOB_SQL_DIR"
 
-################################################################################
-# 步骤7: 运行 jobSQL_test 目录下的所有SQL
-################################################################################
-print_step 7 "运行 jobSQL_test 目录下的所有分析任务"
-
-sql_files=$(find $JOB_SQL_DIR -name "*.sql" | sort)
-
-if [ -z "$sql_files" ]; then
-    echo "[警告] '$JOB_SQL_DIR' 目录下没有找到 SQL 文件"
-else
-    for sql_file in $sql_files; do
-        echo "[信息] 正在执行: $sql_file"
-        hive -f $sql_file
-        if [ $? -ne 0 ]; then
-            echo "[错误] $sql_file 执行失败"
-            exit 1
-        fi
-        echo "[成功] $sql_file 执行成功"
-    done
-fi
-
-################################################################################
-# 步骤8: 打印结束标记
-################################################################################
-print_step 8 "测试流水线执行完成"
-
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║                                                                   ║"
-echo "║                   测试流水线执行成功！                            ║"
-echo "║                                                                   ║"
-echo "╚═══════════════════════════════════════════════════════════════════╝"
-echo ""
-
-exit 0
+print_step 8 "Test pipeline completed"
+echo "[COMPLETED] Test pipeline execution completed successfully"
