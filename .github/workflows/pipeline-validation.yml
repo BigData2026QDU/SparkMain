@@ -1,0 +1,75 @@
+name: Pipeline validation
+
+on:
+  push:
+    branches:
+      - main
+      - issue-11-pipeline-validation
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    name: Syntax, Spark, and Hive checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYSPARK_PYTHON: python
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Spark runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyspark==3.5.0
+
+      - name: Verify lightweight test dataset size
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          files = sorted(Path("dataset_test").glob("*.csv"))
+          total = sum(path.stat().st_size for path in files)
+          print(f"dataset_test files: {[path.name for path in files]}")
+          print(f"dataset_test total bytes: {total}")
+          if not files:
+              raise SystemExit("dataset_test has no CSV files")
+          if total > 64 * 1024:
+              raise SystemExit("dataset_test must stay below 64 KiB for CI")
+          PY
+
+      - name: Run syntax checks
+        run: |
+          bash -n main_pipeline.sh
+          bash -n main_pipeline_test.sh
+          bash -n start_streaming.sh
+          bash -n test/verify_results.sh
+          python -m py_compile \
+            truncate_file.py \
+            dataset/download_movielens.py \
+            cleanPy/clean_ratings.py \
+            cleanPy_test/clean_ratings.py \
+            ci/run_spark_hive_smoke.py
+
+      - name: Compile streaming module
+        run: mvn -B -f SparkMain/pom.xml -DskipTests compile
+
+      - name: Run Spark/Hive smoke test
+        run: python ci/run_spark_hive_smoke.py

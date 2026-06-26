@@ -199,6 +199,22 @@ bash test/verify_results.sh
 4. 结果表使用 `taskN_xxx` 命名格式
 5. 本地测试通过后提交
 
+## CI 验证
+
+仓库包含 GitHub Actions 工作流 `.github/workflows/pipeline-validation.yml`，用于验证流水线变更：
+
+1. 检查 `dataset_test/` 下的 CSV 测试数据总量不超过 64 KiB，避免触发 GitHub CI 资源限制。
+2. 执行 Bash 与 Python 语法检查。
+3. 使用 JDK 17 编译 `SparkMain/pom.xml` 中的 Spark Streaming 模块。
+4. 安装 `pyspark==3.5.0`，通过 `ci/run_spark_hive_smoke.py` 在 `local[2]` 模式启用 Hive catalog，执行 `initializeSQL_test/`、`prepareData_test/` 和 `jobSQL_test/` 并校验结果表。
+
+具备本地 Hive/HDFS 环境时，也可以运行完整轻量测试脚本：
+
+```bash
+chmod +x main_pipeline_test.sh test/verify_results.sh
+./main_pipeline_test.sh
+```
+
 ## 实时流处理
 
 本项目支持基于 Kafka + Spark Structured Streaming 的增量数据处理。

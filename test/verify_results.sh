@@ -1,107 +1,70 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-################################################################################
-# 测试验证脚本
-# 功能：验证测试流水线执行结果
-################################################################################
+set -euo pipefail
 
-HIVE_DB="bigdata_ana_test"
+HIVE_DB="${HIVE_DB:-bigdata_ana_test}"
+HIVE_CMD="${HIVE_CMD:-hive}"
 
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║                                                                   ║"
-echo "║                   测试结果验证                                    ║"
-echo "║                                                                   ║"
-echo "╚═══════════════════════════════════════════════════════════════════╝"
-echo ""
+pass_count=0
+fail_count=0
 
-PASS=0
-FAIL=0
+run_hive_scalar() {
+    local sql="$1"
+    "$HIVE_CMD" -S -e "$sql" 2>/dev/null | tail -n 1 | tr -d '\r'
+}
+
+record_pass() {
+    printf '[PASS] %s\n' "$1"
+    pass_count=$((pass_count + 1))
+}
+
+record_fail() {
+    printf '[FAIL] %s\n' "$1"
+    fail_count=$((fail_count + 1))
+}
 
 check_table_exists() {
-    local table_name=$1
-    if hive -e "USE ${HIVE_DB}; SHOW TABLES;" | grep -q "^${table_name}$"; then
-        echo "[✓] 表 '$table_name' 存在"
-        PASS=$((PASS + 1))
+    local table_name="$1"
+    if "$HIVE_CMD" -S -e "USE ${HIVE_DB}; SHOW TABLES LIKE '${table_name}';" 2>/dev/null | grep -qx "$table_name"; then
+        record_pass "table ${table_name} exists"
     else
-        echo "[✗] 表 '$table_name' 不存在"
-        FAIL=$((FAIL + 1))
+        record_fail "table ${table_name} is missing"
     fi
 }
 
 check_table_has_data() {
-    local table_name=$1
-    local count=$(hive -e "USE ${HIVE_DB}; SELECT COUNT(*) FROM ${table_name};" 2>/dev/null | tail -1)
-    if [ "$count" -gt 0 ] 2>/dev/null; then
-        echo "[✓] 表 '$table_name' 有数据 ($count 行)"
-        PASS=$((PASS + 1))
+    local table_name="$1"
+    local row_count
+    row_count="$(run_hive_scalar "USE ${HIVE_DB}; SELECT COUNT(*) FROM ${table_name};")"
+    if [[ "$row_count" =~ ^[0-9]+$ ]] && [ "$row_count" -gt 0 ]; then
+        record_pass "table ${table_name} has ${row_count} rows"
     else
-        echo "[✗] 表 '$table_name' 无数据"
-        FAIL=$((FAIL + 1))
+        record_fail "table ${table_name} has no data"
     fi
 }
 
-echo "=========================================="
-echo "1. 检查数据库表"
-echo "=========================================="
+printf '\n'
+printf '========================================\n'
+printf 'SparkMain Hive result verification\n'
+printf 'Database: %s\n' "$HIVE_DB"
+printf '========================================\n'
 
-check_table_exists "movies"
-check_table_exists "ratings"
-check_table_exists "tags"
-check_table_exists "links"
+for table in movies ratings tags links task1_movie_stats task2_movie_ranking task3_genre_stats; do
+    check_table_exists "$table"
+done
 
-echo ""
-echo "=========================================="
-echo "2. 检查数据加载"
-echo "=========================================="
+for table in movies ratings tags links task1_movie_stats task2_movie_ranking task3_genre_stats; do
+    check_table_has_data "$table"
+done
 
-check_table_has_data "movies"
-check_table_has_data "ratings"
-check_table_has_data "tags"
-check_table_has_data "links"
-
-echo ""
-echo "=========================================="
-echo "3. 检查视图"
-echo "=========================================="
-
-if hive -e "USE ${HIVE_DB}; SHOW VIEWS;" | grep -q "v_movies_ratings"; then
-    echo "[✓] 视图 'v_movies_ratings' 存在"
-    PASS=$((PASS + 1))
+if "$HIVE_CMD" -S -e "USE ${HIVE_DB}; SHOW VIEWS LIKE 'v_movies_ratings';" 2>/dev/null | grep -qx "v_movies_ratings"; then
+    record_pass "view v_movies_ratings exists"
 else
-    echo "[✗] 视图 'v_movies_ratings' 不存在"
-    FAIL=$((FAIL + 1))
+    record_fail "view v_movies_ratings is missing"
 fi
 
-echo ""
-echo "=========================================="
-echo "4. 检查分析结果"
-echo "=========================================="
+printf '\nPassed: %s\nFailed: %s\n' "$pass_count" "$fail_count"
 
-check_table_exists "task1_movie_stats"
-check_table_has_data "task1_movie_stats"
-
-echo ""
-echo "=========================================="
-echo "验证结果"
-echo "=========================================="
-echo ""
-echo "通过: $PASS"
-echo "失败: $FAIL"
-echo ""
-
-if [ $FAIL -eq 0 ]; then
-    echo "╔═══════════════════════════════════════════════════════════════════╗"
-    echo "║                                                                   ║"
-    echo "║                   所有测试通过！                                  ║"
-    echo "║                                                                   ║"
-    echo "╚═══════════════════════════════════════════════════════════════════╝"
-    exit 0
-else
-    echo "╔═══════════════════════════════════════════════════════════════════╗"
-    echo "║                                                                   ║"
-    echo "║                   存在失败的测试！                                ║"
-    echo "║                                                                   ║"
-    echo "╚═══════════════════════════════════════════════════════════════════╝"
+if [ "$fail_count" -ne 0 ]; then
     exit 1
 fi
