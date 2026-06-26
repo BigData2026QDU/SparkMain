@@ -5,7 +5,7 @@ import org.bigdata.analysis.{AnalyzeRatings, AnalyzeGenres, AnalyzeTime, Analyze
 
 /**
  * 主入口
- * 根据参数执行不同的任务
+ * 个人分析任务
  */
 object Main {
 
