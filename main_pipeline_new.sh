@@ -134,7 +134,7 @@ mkdir -p $OUTPUT_DIR
 
 echo "[信息] 运行评分分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeRatings \
+    --class org.bigdata.analysis.AnalyzeRatings \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -146,7 +146,7 @@ echo "[成功] 评分分析完成"
 
 echo "[信息] 运行类型分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeGenres \
+    --class org.bigdata.analysis.AnalyzeGenres \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -158,7 +158,7 @@ echo "[成功] 类型分析完成"
 
 echo "[信息] 运行时间分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeTime \
+    --class org.bigdata.analysis.AnalyzeTime \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -170,7 +170,7 @@ echo "[成功] 时间分析完成"
 
 echo "[信息] 运行用户行为分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeUsers \
+    --class org.bigdata.analysis.AnalyzeUsers \
     --master $SPARK_MASTER \
     $JAR_PATH
 
