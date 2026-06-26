@@ -1,5 +1,6 @@
 package org.example.pipeline
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 
 import scala.collection.mutable.ListBuffer
@@ -145,7 +146,7 @@ object SparkSqlPipeline {
 
     files.foreach { sqlFile =>
       println(s"[INFO] Running SQL file: $sqlFile")
-      splitSql(Files.readString(sqlFile)).foreach { statement =>
+      splitSql(new String(Files.readAllBytes(sqlFile), StandardCharsets.UTF_8)).foreach { statement =>
         if (isSkippedLegacySetting(statement)) {
           println(s"[INFO] Skipping legacy setting: ${firstLine(statement)}")
         } else {
