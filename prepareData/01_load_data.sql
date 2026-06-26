@@ -1,12 +1,11 @@
--- 数据准备：加载数据到 Hive 表
--- 使用 Hive on Spark 执行
+-- 数据准备：验证外部表并创建 LuckyAnJun UserBehavior DWD 表
+-- 使用 Hive on Spark 执行；如集群 Hive Spark 引擎缺少 Scala 依赖，可临时改为 mr 执行。
 
 SET hive.execution.engine=spark;
 SET spark.master=local[*];
 
 USE bigdata_ana;
 
--- 验证数据加载
 SELECT 'movies' AS table_name, COUNT(*) AS row_count FROM movies
 UNION ALL
 SELECT 'ratings' AS table_name, COUNT(*) AS row_count FROM ratings
@@ -17,7 +16,6 @@ SELECT 'links' AS table_name, COUNT(*) AS row_count FROM links;
 
 SELECT 'user_behavior' AS table_name, COUNT(*) AS row_count FROM user_behavior;
 
--- 创建临时视图用于快速查询
 CREATE OR REPLACE VIEW v_movies_ratings AS
 SELECT
     m.movieId,
@@ -29,24 +27,24 @@ SELECT
 FROM movies m
 JOIN ratings r ON m.movieId = r.movieId;
 
+DROP VIEW IF EXISTS v_user_item_day_flags;
 DROP TABLE IF EXISTS dwd_user_behavior_clean;
-CREATE TABLE dwd_user_behavior_clean AS
-SELECT
-    user_id,
-    item_id,
-    category_id,
-    behavior_type,
-    `timestamp`,
-    CAST(event_time AS TIMESTAMP) AS event_time,
-    event_date,
-    event_hour,
-    weekday
-FROM user_behavior
-WHERE behavior_type IN ('pv', 'buy', 'cart', 'fav')
-  AND user_id IS NOT NULL
-  AND item_id IS NOT NULL
-  AND category_id IS NOT NULL
-  AND `timestamp` > 0;
+CREATE EXTERNAL TABLE dwd_user_behavior_clean (
+    user_id BIGINT,
+    item_id BIGINT,
+    category_id BIGINT,
+    behavior_type STRING,
+    `timestamp` BIGINT,
+    event_time TIMESTAMP,
+    event_date STRING,
+    event_hour INT,
+    weekday INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/hive/bigdata_ana/user_behavior'
+TBLPROPERTIES ("skip.header.line.count"="1");
 
 CREATE OR REPLACE VIEW v_user_item_day_flags AS
 SELECT

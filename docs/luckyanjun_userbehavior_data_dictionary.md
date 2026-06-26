@@ -47,7 +47,7 @@
 | 表名 | 类型 | 说明 |
 | --- | --- | --- |
 | `user_behavior` | 外部表 | HDFS 中清洗后 CSV 的落地表 |
-| `dwd_user_behavior_clean` | 管理表 | 从外部表生成的明细宽表，后续离线分析统一读取该表 |
+| `dwd_user_behavior_clean` | 外部明细表 | 以清洗后 CSV 为数据源的 DWD 表，后续离线分析统一读取该表 |
 | `v_user_item_day_flags` | 视图 | 用户-商品-日期粒度的浏览、意向、购买标记 |
 
 ## HDFS 路径
