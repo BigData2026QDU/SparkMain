@@ -1,11 +1,12 @@
 package org.example.analysis
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, SparkSession, SaveMode}
+import org.example.utils.MySQLExporter
+import java.util.Properties
 
 /**
  * 类型分析任务
- * 分析各类型电影的评分分布
+ * 分析各类型电影的评分分布，输出到 MySQL
  */
 object AnalyzeGenres {
 
@@ -46,8 +47,18 @@ object AnalyzeGenres {
     // 输出结果
     genreStats.show(20, truncate = false)
 
-    // 保存结果
+    // 保存到 Parquet
     genreStats.write.mode("overwrite").parquet("output/genre_stats")
+
+    // 导出到 MySQL（如果配置了环境变量）
+    val jdbcUrl = sys.env.getOrElse("MYSQL_JDBC_URL", "")
+    val mysqlUser = sys.env.getOrElse("MYSQL_USER", "")
+    val mysqlPassword = sys.env.getOrElse("MYSQL_PASSWORD", "")
+
+    if (jdbcUrl.nonEmpty && mysqlUser.nonEmpty) {
+      val props = MySQLExporter.createProperties(mysqlUser, mysqlPassword)
+      MySQLExporter.exportToMySQL(genreStats, "genre_stats", jdbcUrl, props)
+    }
 
     println("类型分析完成")
     spark.stop()

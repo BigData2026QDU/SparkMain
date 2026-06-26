@@ -1,11 +1,12 @@
 package org.example.analysis
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, SparkSession, SaveMode}
+import org.example.utils.MySQLExporter
+import java.util.Properties
 
 /**
  * 评分分析任务
- * 从 Parquet 文件读取数据，进行分析并输出结果
+ * 从 Parquet 文件读取数据，进行分析并输出结果到 MySQL
  */
 object AnalyzeRatings {
 
@@ -39,8 +40,18 @@ object AnalyzeRatings {
     // 输出结果
     movieStats.show(20, truncate = false)
 
-    // 保存结果
+    // 保存到 Parquet
     movieStats.write.mode("overwrite").parquet("output/movie_stats")
+
+    // 导出到 MySQL（如果配置了环境变量）
+    val jdbcUrl = sys.env.getOrElse("MYSQL_JDBC_URL", "")
+    val mysqlUser = sys.env.getOrElse("MYSQL_USER", "")
+    val mysqlPassword = sys.env.getOrElse("MYSQL_PASSWORD", "")
+
+    if (jdbcUrl.nonEmpty && mysqlUser.nonEmpty) {
+      val props = MySQLExporter.createProperties(mysqlUser, mysqlPassword)
+      MySQLExporter.exportToMySQL(movieStats, "movie_stats", jdbcUrl, props)
+    }
 
     println("评分分析完成")
     spark.stop()
