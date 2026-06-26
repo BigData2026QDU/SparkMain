@@ -4,6 +4,7 @@ set -euo pipefail
 HIVE_DB="bigdata_ana_test"
 HDFS_BASE_PATH="/user/hive/bigdata_ana_test"
 PYTHON_CMD="${PYTHON_CMD:-python3}"
+HIVE_EXECUTION_ENGINE="${HIVE_EXECUTION_ENGINE:-}"
 
 DATASET_DIR="dataset_test"
 CLEANED_DIR="cleanedDataset_test"
@@ -48,6 +49,7 @@ upload_csv() {
 
 run_sql_dir() {
     local sql_dir="$1"
+    local temp_sql
     if [ ! -d "$sql_dir" ]; then
         echo "[INFO] SQL directory not found, skipping: $sql_dir"
         return
@@ -56,7 +58,14 @@ run_sql_dir() {
     while IFS= read -r sql_file; do
         [ -n "$sql_file" ] || continue
         echo "[INFO] Running SQL: $sql_file"
-        hive -f "$sql_file"
+        if [ -n "$HIVE_EXECUTION_ENGINE" ]; then
+            temp_sql="$(mktemp)"
+            sed "s/SET hive.execution.engine=[^;]*;/SET hive.execution.engine=${HIVE_EXECUTION_ENGINE};/g" "$sql_file" > "$temp_sql"
+            hive -f "$temp_sql"
+            rm -f "$temp_sql"
+        else
+            hive -f "$sql_file"
+        fi
     done < <(find "$sql_dir" -name "*.sql" | sort)
 }
 
