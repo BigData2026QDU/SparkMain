@@ -1,9 +1,6 @@
--- 任务1: 基础聚合分析 - 电影平均评分统计
--- 使用 Hive on Spark 执行
+﻿-- 任务1: 基础聚合分析 - 电影平均评分统计
 -- 展示基础聚合函数的使用
 
-SET hive.execution.engine=spark;
-SET spark.master=local[*];
 
 USE bigdata_ana;
 

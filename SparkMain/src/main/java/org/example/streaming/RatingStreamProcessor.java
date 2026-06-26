@@ -9,20 +9,18 @@ import org.apache.spark.sql.types.*;
 
 /**
  * 评分数据流处理器
- * 从 Kafka 消费评分数据，增量处理后写入 Hive
+ * 从 Kafka 消费评分数据，增量处理后写入文件型 Spark 数据集
  */
 public class RatingStreamProcessor {
 
     private static final String KAFKA_TOPIC = "ratings";
     private static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:9092";
     private static final String CHECKPOINT_PATH = "/tmp/spark/checkpoints/ratings";
-    private static final String HIVE_TABLE = "bigdata_ana.ratings_streaming";
+    private static final String OUTPUT_PATH = "output/streaming/ratings";
 
     public static void main(String[] args) throws Exception {
         SparkSession spark = SparkSession.builder()
                 .appName("RatingStreamProcessor")
-                .config("spark.sql.warehouse.dir", "/user/hive/warehouse")
-                .enableHiveSupport()
                 .getOrCreate();
 
         // 定义 Kafka 数据源
@@ -52,12 +50,12 @@ public class RatingStreamProcessor {
         Dataset<Row> ratingsWithTimestamp = ratings
                 .withColumn("process_time", org.apache.spark.sql.functions.current_timestamp());
 
-        // 写入 Hive 表（增量合并）
+        // 写入本地或分布式文件路径。
         StreamingQuery query = ratingsWithTimestamp.writeStream()
                 .outputMode("append")
-                .format("hive")
+                .format("parquet")
                 .option("checkpointLocation", CHECKPOINT_PATH)
-                .option("path", "/user/hive/warehouse/bigdata_ana.db/ratings_streaming")
+                .option("path", OUTPUT_PATH)
                 .trigger(Trigger.ProcessingTime("10 seconds"))
                 .start();
 

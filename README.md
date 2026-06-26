@@ -1,23 +1,19 @@
 # SparkMain
 
-## 简介
-
-SparkMain 是一个基于 Apache Spark 的大数据处理流水线，使用 MovieLens 电影评分数据集进行分析。本项目提供自动化数据清洗、Hive 建表、数据加载和分析任务执行的完整流程。
+SparkMain 是一个基于 Apache Spark 3.5 + Scala 的 MovieLens 大数据分析流水线。项目不再依赖 Hive CLI、Hive metastore 或 HDFS staging；批处理由仓库内的 Scala runner 通过 `spark-submit` 执行，结果导出到 `output/`。
 
 ## 环境要求
 
 | 组件 | 版本 | 说明 |
-|------|------|------|
-| JDK | 17 | Java 开发工具包 |
-| Apache Spark | 3.5.0 | 大数据处理框架 |
-| Hive | 3.1.x | 数据仓库 |
-| Hadoop (HDFS) | - | 分布式文件系统 |
+| --- | --- | --- |
+| JDK | 17 | Maven 编译和 Spark 运行 |
+| Apache Spark | 3.5.0 | 批处理与流处理 |
+| Scala | 2.12.18 | Spark 3.5 对应 Scala 版本 |
+| Maven | 3.8+ | 构建 `SparkMain/pom.xml` |
 | Python | 3.8+ | 数据清洗脚本 |
-| Kafka | 3.6+ | 消息队列（实时流处理） |
+| Kafka | 3.6+ | 实时流处理，可选 |
 
 ## 快速开始
-
-### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/BigData2026QDU/SparkMain.git
@@ -25,287 +21,120 @@ cd SparkMain
 git submodule update --init --recursive
 ```
 
-### 2. 下载数据集
-
-从 [MovieLens 25M](https://grouplens.org/datasets/movielens/25m/) 下载数据集，将 CSV 文件放入 `dataset/` 目录。
-
-或使用内置下载脚本：
+下载 MovieLens 25M 数据集后，将 CSV 放入 `dataset/`，或运行：
 
 ```bash
 python dataset/download_movielens.py
 ```
 
-### 3. 运行流水线
+生产流水线：
 
-**生产模式：**
-
-Linux/Mac：
 ```bash
 chmod +x main_pipeline.sh
 ./main_pipeline.sh
 ```
 
-Windows：
-```cmd
-main_pipeline.bat
-```
+轻量测试流水线：
 
-**测试模式：**
-
-Linux/Mac：
 ```bash
 chmod +x main_pipeline_test.sh
 ./main_pipeline_test.sh
 ```
 
-Windows：
+Windows 可运行：
+
 ```cmd
+main_pipeline.bat
 main_pipeline_test.bat
 ```
 
-## 流水线说明
-
-### 执行流程
-
-流水线自动执行以下 8 个步骤：
+## 批处理流程
 
 | 步骤 | 操作 | 说明 |
-|------|------|------|
-| 1 | 检查/创建 Hive 数据库 | 数据库 `bigdata_ana` 不存在则自动创建 |
-| 2 | 截断大文件 | `truncate_file.py` 将 CSV 截断至 300MB |
-| 3 | 运行清洗脚本 | 执行 `cleanPy/` 目录下所有 Python 脚本 |
-| 4 | 上传至 HDFS | 清理旧数据并上传清洗后的 CSV |
-| 5 | 初始化 Hive 表 | 检查表是否存在，不存在则执行 `initializeSQL/` |
-| 6 | 数据准备 | 执行 `prepareData/` 中的 SQL（创建视图等） |
-| 7 | 执行分析任务 | 执行 `jobSQL/` 目录下所有 SQL 文件 |
-| 8 | 完成标记 | 打印流水线执行完成信息 |
+| --- | --- | --- |
+| 1 | 检查环境 | 需要 `spark-submit`、`mvn`、`python` |
+| 2 | 准备数据 | 生产模式会截断大文件，测试模式使用 `dataset_test/` |
+| 3 | 清洗数据 | 执行 `cleanPy/` 或 `cleanPy_test/` |
+| 4 | 构建模块 | `mvn -B -f SparkMain/pom.xml -DskipTests package` |
+| 5 | 执行 Spark SQL | `org.example.pipeline.SparkSqlPipeline` 读取 CSV 并执行 SQL |
+| 6 | 导出结果 | `task*` 表导出到 `output/<database>/` |
 
-### 目录结构
+## SQL 任务规范
 
-```
-SparkMain/
-├── dataset/            # 生产数据（MovieLens CSV 文件）
-├── dataset_test/       # 测试数据（轻量级，10-100KB）
-├── truncatedDataset/   # 截断后的数据（自动生成）
-├── cleanedDataset/     # 清洗后的数据（自动生成）
-├── cleanPy/            # 生产清洗脚本
-├── cleanPy_test/       # 测试清洗脚本
-├── initializeSQL/      # 生产建表 SQL
-├── initializeSQL_test/ # 测试建表 SQL
-├── prepareData/        # 生产数据准备 SQL
-├── prepareData_test/   # 测试数据准备 SQL
-├── jobSQL/             # 生产分析任务 SQL
-├── jobSQL_test/        # 测试分析任务 SQL
-├── main_pipeline.sh    # 生产流水线脚本（Linux）
-├── main_pipeline.bat   # 生产流水线脚本（Windows）
-├── main_pipeline_test.sh  # 测试流水线脚本（Linux）
-├── main_pipeline_test.bat # 测试流水线脚本（Windows）
-├── truncate_file.py    # 大文件截断工具
-└── test/               # 测试验证脚本
+在 `jobSQL/` 中创建 SQL 文件，按文件名排序执行，例如 `06_task6_hot_movies.sql`。
+
+SQL 文件应使用当前 Spark database 中的表：
+
+```sql
+USE bigdata_ana;
+
+DROP TABLE IF EXISTS task6_hot_movies;
+
+CREATE TABLE task6_hot_movies AS
+SELECT ...
+FROM ratings
+JOIN movies ON ratings.movieId = movies.movieId;
+
+SELECT * FROM task6_hot_movies LIMIT 20;
 ```
 
-## 如何编写新任务
+结果表命名使用 `taskN_xxx`，这样流水线会自动导出。
 
-### 任务规范
+## 可用源表
 
-在 `jobSQL/` 目录下创建 SQL 文件，遵循以下规范：
+| 表名 | 字段 |
+| --- | --- |
+| `movies` | movieId, title, genres |
+| `ratings` | userId, movieId, rating, timestamp |
+| `tags` | userId, movieId, tag, timestamp |
+| `links` | movieId, imdbId, tmdbId |
 
-1. **文件命名：** `XX_任务名称简述.sql`（XX 为两位数字编号，决定执行顺序）
-   - 示例：`06_task6_hot_movies.sql`
-
-2. **SQL 文件必须包含：**
-   ```sql
-   SET hive.execution.engine=spark;
-   SET spark.master=local[*];
-   
-   USE bigdata_ana;
-   ```
-
-3. **结果表命名：** `taskN_xxx`（N 为任务编号）
-   - 示例：`task6_hot_movies`
-
-4. **SQL 模式：**
-   ```sql
-   SET hive.execution.engine=spark;
-   SET spark.master=local[*];
-   
-   USE bigdata_ana;
-   
-   -- 删除旧结果表（如存在）
-   DROP TABLE IF EXISTS taskN_xxx;
-   
-   -- 创建结果表
-   CREATE TABLE taskN_xxx AS
-   SELECT ...
-   FROM ...
-   WHERE ...;
-   
-   -- 展示结果
-   SELECT * FROM taskN_xxx LIMIT 20;
-   ```
-
-### 测试模式
-
-本项目支持测试模式，使用轻量级测试数据（10-100KB）快速验证流水线。
-
-**测试目录结构：**
-
-| 生产目录 | 测试目录 | 说明 |
-|---------|---------|------|
-| `dataset/` | `dataset_test/` | 测试数据 |
-| `cleanPy/` | `cleanPy_test/` | 测试清洗脚本 |
-| `initializeSQL/` | `initializeSQL_test/` | 测试建表 SQL |
-| `prepareData/` | `prepareData_test/` | 测试数据准备 SQL |
-| `jobSQL/` | `jobSQL_test/` | 测试分析任务 SQL |
-
-**编写测试任务：**
-
-1. 在 `jobSQL_test/` 目录下创建测试 SQL 文件
-2. 使用 `bigdata_ana_test` 数据库
-3. 运行测试流水线验证：
-
-```bash
-# Linux/Mac
-./main_pipeline_test.sh
-
-# Windows
-main_pipeline_test.bat
-```
-
-4. 运行验证脚本检查结果：
-
-```bash
-bash test/verify_results.sh
-```
-
-### 可用数据表
-
-流水线初始化后，`bigdata_ana` 数据库中包含以下表：
-
-| 表名 | 字段 | 说明 |
-|------|------|------|
-| `movies` | movieId, title, genres | 电影信息 |
-| `ratings` | userId, movieId, rating, timestamp | 评分数据 |
-| `tags` | userId, movieId, tag, timestamp | 标签数据 |
-| `links` | movieId, imdbId, tmdbId | 外部链接 |
-
-流水线还会创建临时视图 `v_movies_ratings`（JOIN movies 和 ratings）。
-
-### 提交要求
-
-1. SQL 文件放在 `jobSQL/` 目录
-2. 遵循文件命名规范（`XX_taskname.sql`）
-3. 文件开头包含 Spark 引擎设置和 `USE bigdata_ana`
-4. 结果表使用 `taskN_xxx` 命名格式
-5. 本地测试通过后提交
+`prepareData/01_load_data.sql` 会创建 `v_movies_ratings` 视图。
 
 ## CI 验证
 
-仓库包含 GitHub Actions 工作流 `.github/workflows/pipeline-validation.yml`，用于验证流水线变更：
+`.github/workflows/pipeline-validation.yml` 会执行：
 
-1. 检查 `dataset_test/` 下的 CSV 测试数据总量不超过 64 KiB，避免触发 GitHub CI 资源限制。
-2. 执行 Bash 与 Python 语法检查。
-3. 使用 JDK 17 编译 `SparkMain/pom.xml` 中的 Spark Streaming 模块。
-4. 安装 `pyspark==3.5.0`，通过 `ci/run_spark_hive_smoke.py` 在 `local[2]` 模式启用 Hive catalog，执行 `initializeSQL_test/`、`prepareData_test/` 和 `jobSQL_test/` 并校验结果表。
+1. 检查 `dataset_test/` CSV 总量不超过 64 KiB。
+2. 执行 Bash、Python 语法检查。
+3. 使用 JDK 17 构建 Scala/Spark 模块。
+4. 运行 `ci/run_spark_sql_smoke.py`，在 Spark local 模式下执行 `prepareData_test/` 和 `jobSQL_test/` 并校验结果表。
 
-具备本地 Hive/HDFS 环境时，也可以运行完整轻量测试脚本：
+## 流处理
 
-```bash
-chmod +x main_pipeline_test.sh test/verify_results.sh
-./main_pipeline_test.sh
-```
-
-## 实时流处理
-
-本项目支持基于 Kafka + Spark Structured Streaming 的增量数据处理。
-
-### 架构
+Kafka + Spark Structured Streaming 模块从 `ratings` topic 读取 JSON，追加写入 Parquet：
 
 ```
 Kafka Topic (ratings)
-    ↓
-Spark Structured Streaming
-    ↓
-Hive 表 (ratings_streaming)
+    -> Spark Structured Streaming
+    -> output/streaming/ratings
 ```
 
-### 启动服务
+启动：
 
 ```bash
-# 启动 Kafka + Spark Streaming
 chmod +x start_streaming.sh
 ./start_streaming.sh
 ```
 
-### 生成测试数据
+生成测试数据：
 
 ```bash
-# 编译项目
 cd SparkMain
 mvn clean package
-
-# 运行数据生成器
 java -cp target/spark-streaming-kafka-1.0.0.jar org.example.streaming.RatingProducer
 ```
 
-### 配置文件
+## 目录说明
 
-配置文件位于 `config/streaming.properties`：
-
-```properties
-kafka.bootstrap.servers=localhost:9092
-kafka.topic=ratings
-spark.master=local[*]
-streaming.trigger.interval=10 seconds
-```
-
-## 项目结构
-
-```
-SparkMain/
-├── SparkMain/              # 源代码目录
-│   ├── src/
-│   │   └── main/
-│   │       └── java/
-│   │           └── org/example/streaming/
-│   │               ├── RatingStreamProcessor.java  # Spark Streaming 处理器
-│   │               └── RatingProducer.java          # Kafka 数据生成器
-│   ├── pom.xml            # Maven 配置
-│   └── test/
-├── config/                # 配置文件
-│   └── streaming.properties
-├── AGENTS/                # 项目规范（submodule）
-├── dataset/               # 生产数据目录
-├── dataset_test/          # 测试数据目录（轻量级）
-├── cleanPy/               # 生产清洗脚本
-├── cleanPy_test/          # 测试清洗脚本
-├── initializeSQL/         # 生产建表 SQL
-├── initializeSQL_test/    # 测试建表 SQL
-├── prepareData/           # 生产数据准备 SQL
-├── prepareData_test/      # 测试数据准备 SQL
-├── jobSQL/                # 生产分析任务 SQL
-├── jobSQL_test/           # 测试分析任务 SQL
-├── test/                  # 测试验证脚本
-├── start_streaming.sh     # 启动 Kafka + Spark Streaming
-├── Architecture.md        # 架构文档
-├── README.md              # 项目说明
-├── File_Index.md          # 文件索引
-├── main_pipeline.sh       # 生产流水线脚本（Linux）
-├── main_pipeline.bat      # 生产流水线脚本（Windows）
-├── main_pipeline_test.sh  # 测试流水线脚本（Linux）
-├── main_pipeline_test.bat # 测试流水线脚本（Windows）
-├── truncate_file.py       # 数据截断工具
-└── .gitignore             # Git 忽略配置
-```
-
-## 贡献指南
-
-1. Fork 本仓库
-2. 新建 `feature/xxx` 或 `hotfix/xxx` 分支
-3. 按照「如何编写新任务」规范添加 SQL 文件
-4. 本地测试流水线执行通过
-5. 提交代码并创建 Pull Request
-
-## 许可证
-
-本项目遵循项目规范仓库中的许可证要求。
+| 路径 | 说明 |
+| --- | --- |
+| `SparkMain/src/main/scala/org/example/pipeline/` | Spark SQL 批处理 runner |
+| `SparkMain/src/main/java/org/example/streaming/` | Kafka 流处理与数据生成器 |
+| `dataset/`, `dataset_test/` | 生产和测试 CSV |
+| `cleanPy/`, `cleanPy_test/` | 数据清洗脚本 |
+| `initializeSQL/`, `initializeSQL_test/` | Spark SQL 源表 schema |
+| `prepareData/`, `prepareData_test/` | 数据准备 SQL |
+| `jobSQL/`, `jobSQL_test/` | 分析任务 SQL |
+| `ci/run_spark_sql_smoke.py` | CI smoke test |
+| `output/` | 导出的分析结果 |

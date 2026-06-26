@@ -34,3 +34,6 @@ ENV/
 dataset/*.csv
 temp_download/
 output/
+spark-warehouse*/
+metastore_db/
+derby.log

@@ -1,8 +1,5 @@
--- 测试任务2: 窗口函数分析
--- 使用 Hive on Spark 执行
+﻿-- 测试任务2: 窗口函数分析
 
-SET hive.execution.engine=spark;
-SET spark.master=local[*];
 
 USE bigdata_ana_test;
 

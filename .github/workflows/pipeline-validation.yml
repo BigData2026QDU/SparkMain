@@ -11,7 +11,7 @@ on:
 
 jobs:
   validate:
-    name: Syntax, Spark, and Hive checks
+    name: Syntax and Spark SQL checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -65,10 +65,10 @@ jobs:
             dataset/download_movielens.py \
             cleanPy/clean_ratings.py \
             cleanPy_test/clean_ratings.py \
-            ci/run_spark_hive_smoke.py
+            ci/run_spark_sql_smoke.py
 
-      - name: Compile streaming module
-        run: mvn -B -f SparkMain/pom.xml -DskipTests compile
+      - name: Compile Spark Scala module
+        run: mvn -B -f SparkMain/pom.xml -DskipTests package
 
-      - name: Run Spark/Hive smoke test
-        run: python ci/run_spark_hive_smoke.py
+      - name: Run Spark SQL smoke test
+        run: python ci/run_spark_sql_smoke.py

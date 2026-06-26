@@ -47,8 +47,12 @@ echo "[步骤3] 创建 Kafka Topic..."
 kafka-topics.sh --create --topic ratings --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1 --if-not-exists
 echo "[成功] Topic 创建成功"
 
-# 启动 Spark Streaming 应用
+# 构建并启动 Spark Streaming 应用
 echo "[步骤4] 启动 Spark Streaming 应用..."
+if [ ! -f "SparkMain/target/spark-streaming-kafka-1.0.0.jar" ]; then
+    mvn -B -f SparkMain/pom.xml -DskipTests package
+fi
+
 spark-submit \
     --class org.example.streaming.RatingStreamProcessor \
     --master local[*] \

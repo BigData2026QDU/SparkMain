@@ -1,9 +1,6 @@
--- 任务2: 窗口函数分析 - 电影排名和百分比
--- 使用 Hive on Spark 执行
+﻿-- 任务2: 窗口函数分析 - 电影排名和百分比
 -- 展示 ROW_NUMBER, RANK, PERCENT_RANK 的使用
 
-SET hive.execution.engine=spark;
-SET spark.master=local[*];
 
 USE bigdata_ana;
 
