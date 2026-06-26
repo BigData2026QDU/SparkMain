@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LuckyAnJun UserBehavior Dashboard</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Microsoft YaHei", sans-serif; background: #f6f7f9; color: #1f2937; }
+    header { padding: 18px 24px; background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+    main { padding: 24px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    section { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; min-height: 160px; }
+    h1 { margin: 0; font-size: 22px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+    .status { margin-top: 6px; color: #6b7280; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LuckyAnJun 淘宝用户行为分析看板</h1>
+    <div class="status" id="status">等待刷新</div>
+  </header>
+  <main>
+    <section><h2>转化漏斗</h2><pre id="funnel">loading...</pre></section>
+    <section><h2>时段高峰</h2><pre id="time">loading...</pre></section>
+    <section><h2>类目与商品效率</h2><pre id="category">loading...</pre></section>
+    <section><h2>用户分层与留存</h2><pre id="user">loading...</pre></section>
+    <section><h2>实时 5 分钟窗口</h2><pre id="realtime">loading...</pre></section>
+  </main>
+  <script>
+    const endpoints = {
+      funnel: '/api/luckyanjun/funnel',
+      time: '/api/luckyanjun/time-hourly',
+      category: '/api/luckyanjun/category-efficiency',
+      user: '/api/luckyanjun/user-segments',
+      realtime: '/api/luckyanjun/realtime-window'
+    };
+
+    async function loadPanel(id, url) {
+      const target = document.getElementById(id);
+      try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        const data = await response.json();
+        target.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        target.textContent = `接口待接入: ${url}\n${error.message}`;
+      }
+    }
+
+    async function refresh() {
+      await Promise.all(Object.entries(endpoints).map(([id, url]) => loadPanel(id, url)));
+      document.getElementById('status').textContent = `最近刷新: ${new Date().toLocaleString()}`;
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

@@ -25,8 +25,8 @@ def clean_ratings():
     output_file = os.path.join(OUTPUT_DIR, "ratings.csv")
 
     if not os.path.exists(input_file):
-        print(f"[错误] 输入文件不存在: {input_file}")
-        sys.exit(1)
+        print(f"[跳过] 输入文件不存在: {input_file}")
+        return
 
     print(f"[信息] 输入文件: {input_file}")
     print(f"[信息] 输出文件: {output_file}")

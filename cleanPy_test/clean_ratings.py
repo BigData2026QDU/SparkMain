@@ -14,6 +14,10 @@ OUTPUT_FILE = os.path.join(OUTPUT_DIR, "ratings.csv")
 
 def clean_ratings():
     """清洗评分数据"""
+    if not os.path.exists(INPUT_FILE):
+        print(f"跳过评分数据清洗: {INPUT_FILE} 不存在")
+        return
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     total = 0

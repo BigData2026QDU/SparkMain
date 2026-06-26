@@ -34,7 +34,7 @@ public class RatingStreamProcessor {
                 .load();
 
         // 定义 JSON 数据结构
-        Schema ratingSchema = new StructType()
+        StructType ratingSchema = new StructType()
                 .add("userId", DataTypes.IntegerType)
                 .add("movieId", DataTypes.IntegerType)
                 .add("rating", DataTypes.DoubleType)

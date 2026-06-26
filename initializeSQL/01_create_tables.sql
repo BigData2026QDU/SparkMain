@@ -9,7 +9,7 @@ USE bigdata_ana;
 
 -- 创建电影表
 DROP TABLE IF EXISTS movies;
-CREATE TABLE movies (
+CREATE EXTERNAL TABLE movies (
     movieId INT,
     title STRING,
     genres STRING
@@ -17,11 +17,12 @@ CREATE TABLE movies (
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
+LOCATION '/user/hive/bigdata_ana/movies'
 TBLPROPERTIES ("skip.header.line.count"="1");
 
 -- 创建评分表
 DROP TABLE IF EXISTS ratings;
-CREATE TABLE ratings (
+CREATE EXTERNAL TABLE ratings (
     userId INT,
     movieId INT,
     rating DOUBLE,
@@ -30,11 +31,12 @@ CREATE TABLE ratings (
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
+LOCATION '/user/hive/bigdata_ana/ratings'
 TBLPROPERTIES ("skip.header.line.count"="1");
 
 -- 创建标签表
 DROP TABLE IF EXISTS tags;
-CREATE TABLE tags (
+CREATE EXTERNAL TABLE tags (
     userId INT,
     movieId INT,
     tag STRING,
@@ -43,11 +45,12 @@ CREATE TABLE tags (
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
+LOCATION '/user/hive/bigdata_ana/tags'
 TBLPROPERTIES ("skip.header.line.count"="1");
 
 -- 创建链接表
 DROP TABLE IF EXISTS links;
-CREATE TABLE links (
+CREATE EXTERNAL TABLE links (
     movieId INT,
     imdbId STRING,
     tmdbId INT
@@ -55,4 +58,24 @@ CREATE TABLE links (
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY ','
 STORED AS TEXTFILE
+LOCATION '/user/hive/bigdata_ana/links'
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+-- LuckyAnJun 个人独立分析：淘宝用户行为表
+DROP TABLE IF EXISTS user_behavior;
+CREATE EXTERNAL TABLE user_behavior (
+    user_id BIGINT,
+    item_id BIGINT,
+    category_id BIGINT,
+    behavior_type STRING,
+    `timestamp` BIGINT,
+    event_time STRING,
+    event_date STRING,
+    event_hour INT,
+    weekday INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/user/hive/bigdata_ana/user_behavior'
 TBLPROPERTIES ("skip.header.line.count"="1");

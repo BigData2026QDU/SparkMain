@@ -31,6 +31,13 @@
 原始数据 → 数据清洗 → HDFS存储 → Hive分析 → 结果输出
 ```
 
+LuckyAnJun 淘宝用户行为个人分析数据流:
+
+```
+UserBehavior.csv → 清洗与时间字段补充 → HDFS表目录 → Hive外部表 → Spark SQL离线报表
+历史日志回放 → Kafka taobao_behavior → Spark Structured Streaming → 5分钟窗口指标
+```
+
 ## 5. 部署架构
 
 - 本地开发环境

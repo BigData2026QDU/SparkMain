@@ -106,26 +106,21 @@ hdfs dfs -rm -r -f %HDFS_BASE_PATH%/* 2>nul
 echo [INFO] Creating HDFS directory...
 hdfs dfs -mkdir -p %HDFS_BASE_PATH%
 
-REM Upload original test data
-for %%f in (%DATASET_DIR%\*.csv) do (
+REM Upload cleaned test data by table directory
+for %%f in (%CLEANED_DIR%\*.csv) do (
     set csv_file=%%~nxf
-    echo [INFO] Uploading: !csv_file!
-    hdfs dfs -put "%%f" %HDFS_BASE_PATH%/
+    set table_name=%%~nf
+    echo [INFO] Uploading: !csv_file! -^> !table_name!
+    hdfs dfs -mkdir -p %HDFS_BASE_PATH%/!table_name!
+    hdfs dfs -put -f "%%f" %HDFS_BASE_PATH%/!table_name!/
 
-    hdfs dfs -test -e %HDFS_BASE_PATH%/!csv_file!
+    hdfs dfs -test -e %HDFS_BASE_PATH%/!table_name!/!csv_file!
     if !ERRORLEVEL! EQU 0 (
         echo [SUCCESS] !csv_file! uploaded
     ) else (
         echo [ERROR] !csv_file! upload failed
         exit /b 1
     )
-)
-
-REM Upload cleaned data if exists
-for %%f in (%CLEANED_DIR%\*.csv) do (
-    set csv_file=%%~nxf
-    echo [INFO] Uploading cleaned: !csv_file!
-    hdfs dfs -put "%%f" %HDFS_BASE_PATH%/
 )
 
 echo [SUCCESS] All test files uploaded to HDFS

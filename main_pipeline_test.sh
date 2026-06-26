@@ -135,34 +135,30 @@ hdfs dfs -rm -r -f $HDFS_BASE_PATH/* 2>/dev/null || true
 
 hdfs dfs -mkdir -p $HDFS_BASE_PATH
 
-# 上传原始测试数据（因为测试数据已经很小）
-for csv_file in $DATASET_DIR/*.csv; do
-    if [ -f "$csv_file" ]; then
-        filename=$(basename $csv_file)
-        echo "[信息] 正在上传: $filename"
-        hdfs dfs -put $csv_file $HDFS_BASE_PATH/
-        
-        if hdfs dfs -test -e $HDFS_BASE_PATH/$filename; then
-            echo "[成功] $filename 上传成功"
-        else
-            echo "[错误] $filename 上传失败"
-            exit 1
-        fi
+upload_dir="$CLEANED_DIR"
+csv_files=$(find $upload_dir -name "*.csv")
+if [ -z "$csv_files" ]; then
+    upload_dir="$DATASET_DIR"
+    csv_files=$(find $upload_dir -name "*.csv")
+fi
+
+for csv_file in $csv_files; do
+    filename=$(basename $csv_file)
+    table_name="${filename%.csv}"
+    echo "[信息] 正在上传: $filename -> $table_name"
+    hdfs dfs -mkdir -p $HDFS_BASE_PATH/$table_name
+    hdfs dfs -put -f $csv_file $HDFS_BASE_PATH/$table_name/
+
+    if hdfs dfs -test -e $HDFS_BASE_PATH/$table_name/$filename; then
+        echo "[成功] $filename 上传成功"
+    else
+        echo "[错误] $filename 上传失败"
+        exit 1
     fi
 done
 
-# 如果有清洗后的数据，也上传
-csv_files=$(find $CLEANED_DIR -name "*.csv")
-if [ -n "$csv_files" ]; then
-    for csv_file in $csv_files; do
-        filename=$(basename $csv_file)
-        echo "[信息] 正在上传清洗后的: $filename"
-        hdfs dfs -put $csv_file $HDFS_BASE_PATH/
-    done
-fi
-
 echo "[信息] 验证HDFS文件数量..."
-hdfs_count=$(hdfs dfs -ls $HDFS_BASE_PATH/*.csv 2>/dev/null | wc -l)
+hdfs_count=$(hdfs dfs -ls $HDFS_BASE_PATH/*/*.csv 2>/dev/null | wc -l)
 echo "[信息] HDFS文件数: $hdfs_count"
 
 ################################################################################
@@ -172,7 +168,7 @@ print_step 5 "检查 Hive 表并决定是否执行初始化"
 
 need_initialize=false
 
-for csv_file in $DATASET_DIR/*.csv; do
+for csv_file in $upload_dir/*.csv; do
     if [ -f "$csv_file" ]; then
         filename=$(basename $csv_file)
         table_name="${filename%.csv}"

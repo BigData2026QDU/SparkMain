@@ -2,7 +2,7 @@
 
 ## 简介
 
-SparkMain 是一个基于 Apache Spark 的大数据处理流水线，使用 MovieLens 电影评分数据集进行分析。本项目提供自动化数据清洗、Hive 建表、数据加载和分析任务执行的完整流程。
+SparkMain 是一个基于 Apache Spark 的大数据处理流水线，包含 MovieLens 示例任务，以及 LuckyAnJun 基于淘宝 `UserBehavior.csv` 的个人独立分析任务。本项目提供自动化数据清洗、Hive 建表、数据加载、离线报表和 Kafka + Spark Structured Streaming 实时统计流程。
 
 ## 环境要求
 
@@ -34,6 +34,8 @@ git submodule update --init --recursive
 ```bash
 python dataset/download_movielens.py
 ```
+
+LuckyAnJun 个人任务使用淘宝用户行为数据集，将 `UserBehavior.csv` 放入 `dataset/` 目录。该任务只使用字段 `user_id,item_id,category_id,behavior_type,timestamp`，不做金额、GMV 或客单价分析。
 
 ### 3. 运行流水线
 
@@ -242,6 +244,36 @@ kafka.topic=ratings
 spark.master=local[*]
 streaming.trigger.interval=10 seconds
 ```
+
+## LuckyAnJun UserBehavior 个人独立分析
+
+### 离线报表
+
+该模块对应 LuckyAnJun 的 4 个离线分析 issue:
+
+| Issue | 报表 | 结果表 |
+|------|------|------|
+| #15 | 用户行为漏斗与转化流失分析 | `lb_funnel_overall`, `lb_funnel_daily` |
+| #16 | 时段流量与购买高峰分析 | `lb_time_hourly_behavior`, `lb_time_weekday_hour_heatmap` |
+| #17 | 类目热度与商品转化效率分析 | `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail` |
+| #18 | 用户分层、留存与短期复购分析 | `lb_user_segments`, `lb_user_segment_summary`, `lb_user_retention` |
+
+数据字典见 `docs/luckyanjun_userbehavior_data_dictionary.md`，运行说明见 `docs/luckyanjun_userbehavior_runbook.md`。
+
+### 实时统计
+
+该模块对应 issue #19，使用历史日志回放模拟实时流:
+
+```bash
+bash start_user_behavior_streaming.sh
+bash replay_user_behavior.sh ../dataset_test/UserBehavior.csv taobao_behavior localhost:9092 200
+```
+
+实时窗口指标包括 PV、近似 UV、收藏数、加购数、购买数、购买用户数、转化率、热门类目/商品和异常预警。
+
+### 动态展示
+
+`web/luckyanjun_dashboard.html` 提供 5 秒自动刷新的动态报表页面骨架，后端接入 `/api/luckyanjun/*` 接口后即可展示离线和实时结果。
 
 ## 项目结构
 

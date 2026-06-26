@@ -34,3 +34,5 @@ ENV/
 dataset/*.csv
 temp_download/
 output/
+truncatedDataset*/
+cleanedDataset*/

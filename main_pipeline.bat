@@ -116,10 +116,12 @@ hdfs dfs -mkdir -p %HDFS_BASE_PATH%
 set csv_count=0
 for %%f in (%CLEANED_DIR%\*.csv) do (
     set csv_file=%%~nxf
+    set table_name=%%~nf
     echo [INFO] Uploading: !csv_file!
-    hdfs dfs -put "%%f" %HDFS_BASE_PATH%/
+    hdfs dfs -mkdir -p %HDFS_BASE_PATH%/!table_name!
+    hdfs dfs -put -f "%%f" %HDFS_BASE_PATH%/!table_name!/
 
-    hdfs dfs -test -e %HDFS_BASE_PATH%/!csv_file!
+    hdfs dfs -test -e %HDFS_BASE_PATH%/!table_name!/!csv_file!
     if !ERRORLEVEL! EQU 0 (
         echo [SUCCESS] !csv_file! uploaded
         set /a csv_count+=1

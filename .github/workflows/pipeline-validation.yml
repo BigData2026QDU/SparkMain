@@ -1,0 +1,53 @@
+name: Pipeline Validation
+
+on:
+  push:
+    branches:
+      - main
+      - 'luckyanjun/**'
+  pull_request:
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile truncate_file.py
+          find cleanPy cleanPy_test dataset -name "*.py" -print0 | xargs -0 -r python -m py_compile
+
+      - name: Validate shell syntax
+        run: |
+          bash -n main_pipeline.sh
+          bash -n main_pipeline_test.sh
+          bash -n start_streaming.sh
+          bash -n start_user_behavior_streaming.sh
+          bash -n test/verify_results.sh
+
+      - name: Validate SQL assets exist
+        run: |
+          test -s initializeSQL/01_create_tables.sql
+          test -s prepareData/01_load_data.sql
+          test -s jobSQL/06_luckyanjun_funnel_conversion.sql
+          test -s jobSQL/07_luckyanjun_time_peak.sql
+          test -s jobSQL/08_luckyanjun_category_item_efficiency.sql
+          test -s jobSQL/09_luckyanjun_user_segment_retention.sql
+          grep -R "USE bigdata_ana" jobSQL/06_luckyanjun_funnel_conversion.sql jobSQL/07_luckyanjun_time_peak.sql jobSQL/08_luckyanjun_category_item_efficiency.sql jobSQL/09_luckyanjun_user_segment_retention.sql
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Compile streaming module
+        working-directory: SparkMain
+        run: mvn -q -DskipTests package

@@ -150,10 +150,12 @@ if [ -z "$csv_files" ]; then
 else
     for csv_file in $csv_files; do
         filename=$(basename $csv_file)
+        table_name="${filename%.csv}"
         echo "[信息] 正在上传: $filename"
-        hdfs dfs -put $csv_file $HDFS_BASE_PATH/
+        hdfs dfs -mkdir -p $HDFS_BASE_PATH/$table_name
+        hdfs dfs -put -f $csv_file $HDFS_BASE_PATH/$table_name/
 
-        if hdfs dfs -test -e $HDFS_BASE_PATH/$filename; then
+        if hdfs dfs -test -e $HDFS_BASE_PATH/$table_name/$filename; then
             echo "[成功] $filename 上传成功"
         else
             echo "[错误] $filename 上传失败"
@@ -163,7 +165,7 @@ else
 fi
 
 echo "[信息] 验证HDFS文件数量..."
-hdfs_count=$(hdfs dfs -ls $HDFS_BASE_PATH/*.csv 2>/dev/null | wc -l)
+hdfs_count=$(hdfs dfs -ls $HDFS_BASE_PATH/*/*.csv 2>/dev/null | wc -l)
 local_count=$(ls -1 $CLEANED_DIR/*.csv 2>/dev/null | wc -l)
 echo "[信息] 本地CSV文件数: $local_count, HDFS文件数: $hdfs_count"
 
