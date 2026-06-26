@@ -36,7 +36,11 @@ object SmokeTest {
     "lb_category_conversion_rank",
     "lb_category_low_conversion",
     "lb_item_long_tail",
-    "lb_user_segment_summary"
+    "lb_user_segment_summary",
+    "lb_user_active_day_distribution",
+    "lb_user_retention",
+    "lb_user_retention_heatmap",
+    "lb_repurchase_behavior_depth"
   )
 
   def main(args: Array[String]): Unit = {
