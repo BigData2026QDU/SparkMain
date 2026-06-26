@@ -45,6 +45,13 @@ spark-submit \
   bigdata_ana \
   dwd_user_behavior_clean \
   /user/hive/bigdata_ana
+
+spark-submit \
+  --class org.example.analysis.UserBehaviorCategoryItemJob \
+  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
+  bigdata_ana \
+  dwd_user_behavior_clean \
+  /user/hive/bigdata_ana
 ```
 
 ## 流水线产物
@@ -67,7 +74,8 @@ spark-submit \
 - `lb_funnel_overall`, `lb_funnel_daily`
 - `lb_time_hourly_behavior`, `lb_time_hour_distribution`, `lb_time_weekday_hour_heatmap`
 - `lb_time_high_conversion_slots`, `lb_time_low_conversion_slots`
-- `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail`
+- `lb_category_efficiency`, `lb_item_efficiency`
+- `lb_category_topn`, `lb_item_topn`, `lb_category_conversion_rank`, `lb_category_low_conversion`, `lb_item_long_tail`
 - `lb_user_segments`, `lb_user_segment_summary`, `lb_user_retention`
 
 ## 测试验证

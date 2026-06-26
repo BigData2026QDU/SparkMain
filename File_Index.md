@@ -32,6 +32,7 @@
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorCleanJob.scala | Scala Spark 清洗作业 | 清洗 `UserBehavior.csv` 并生成 Hive 明细表 |
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorFunnelJob.scala | Scala Spark 漏斗作业 | 生成 #15 整体和每日漏斗结果表 |
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorTimePeakJob.scala | Scala Spark 时段分析作业 | 生成 #16 日期小时、24 小时分布、星期小时热力图和高低转化时段结果表 |
+| SparkMain/src/main/java/org/example/analysis/UserBehaviorCategoryItemJob.scala | Scala Spark 商品类目作业 | 生成 #17 类目/商品 TopN、转化排名、低转化类目和长尾贡献结果表 |
 
 ## SparkMain/ 目录
 

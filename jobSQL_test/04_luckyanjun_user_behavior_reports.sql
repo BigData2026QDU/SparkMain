@@ -233,9 +233,22 @@ SELECT
     COUNT(CASE WHEN behavior_type = 'fav' THEN 1 END) AS fav_cnt,
     COUNT(CASE WHEN behavior_type = 'cart' THEN 1 END) AS cart_cnt,
     COUNT(CASE WHEN behavior_type = 'buy' THEN 1 END) AS buy_cnt,
-    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv
+    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv,
+    ROUND(
+        CASE
+            WHEN COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) = 0 THEN 0
+            ELSE CAST(COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS DOUBLE)
+                / COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END)
+        END,
+        4
+    ) AS category_conversion_rate
 FROM dwd_user_behavior_clean
-GROUP BY category_id;
+WHERE user_id IS NOT NULL
+  AND item_id IS NOT NULL
+  AND category_id IS NOT NULL
+  AND behavior_type IN ('pv', 'fav', 'cart', 'buy')
+GROUP BY category_id
+HAVING COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) > 0;
 
 DROP TABLE IF EXISTS lb_item_efficiency;
 CREATE TABLE lb_item_efficiency AS
@@ -243,10 +256,140 @@ SELECT
     item_id,
     category_id,
     COUNT(CASE WHEN behavior_type = 'pv' THEN 1 END) AS pv_cnt,
+    COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) AS pv_uv,
+    COUNT(CASE WHEN behavior_type = 'fav' THEN 1 END) AS fav_cnt,
+    COUNT(CASE WHEN behavior_type = 'cart' THEN 1 END) AS cart_cnt,
     COUNT(CASE WHEN behavior_type IN ('fav', 'cart') THEN 1 END) AS intent_cnt,
-    COUNT(CASE WHEN behavior_type = 'buy' THEN 1 END) AS buy_cnt
+    COUNT(CASE WHEN behavior_type = 'buy' THEN 1 END) AS buy_cnt,
+    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv,
+    ROUND(
+        CASE
+            WHEN COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) = 0 THEN 0
+            ELSE CAST(COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS DOUBLE)
+                / COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END)
+        END,
+        4
+    ) AS item_conversion_rate
 FROM dwd_user_behavior_clean
-GROUP BY item_id, category_id;
+WHERE user_id IS NOT NULL
+  AND item_id IS NOT NULL
+  AND category_id IS NOT NULL
+  AND behavior_type IN ('pv', 'fav', 'cart', 'buy')
+GROUP BY item_id, category_id
+HAVING COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) > 0;
+
+DROP TABLE IF EXISTS lb_category_topn;
+CREATE TABLE lb_category_topn AS
+SELECT *
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY pv_cnt DESC, buy_cnt DESC, category_id ASC) AS rank_no,
+        category_id,
+        pv_cnt,
+        pv_uv,
+        fav_cnt,
+        cart_cnt,
+        buy_cnt,
+        buy_uv,
+        category_conversion_rate
+    FROM lb_category_efficiency
+) ranked
+WHERE rank_no <= 20;
+
+DROP TABLE IF EXISTS lb_item_topn;
+CREATE TABLE lb_item_topn AS
+SELECT *
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY pv_cnt DESC, buy_cnt DESC, item_id ASC) AS rank_no,
+        item_id,
+        category_id,
+        pv_cnt,
+        pv_uv,
+        intent_cnt,
+        buy_cnt,
+        buy_uv,
+        item_conversion_rate
+    FROM lb_item_efficiency
+) ranked
+WHERE rank_no <= 20;
+
+DROP TABLE IF EXISTS lb_category_conversion_rank;
+CREATE TABLE lb_category_conversion_rank AS
+SELECT *
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY category_conversion_rate DESC, buy_uv DESC, pv_cnt DESC) AS rank_no,
+        category_id,
+        pv_cnt,
+        pv_uv,
+        fav_cnt,
+        cart_cnt,
+        buy_cnt,
+        buy_uv,
+        category_conversion_rate
+    FROM lb_category_efficiency
+    WHERE pv_uv >= 1
+) ranked
+WHERE rank_no <= 20;
+
+DROP TABLE IF EXISTS lb_category_low_conversion;
+CREATE TABLE lb_category_low_conversion AS
+SELECT *
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY category_conversion_rate ASC, pv_cnt DESC) AS rank_no,
+        category_id,
+        pv_cnt,
+        pv_uv,
+        fav_cnt,
+        cart_cnt,
+        buy_cnt,
+        buy_uv,
+        category_conversion_rate
+    FROM lb_category_efficiency
+    WHERE pv_cnt >= (SELECT AVG(pv_cnt) FROM lb_category_efficiency)
+) ranked
+WHERE rank_no <= 20;
+
+DROP TABLE IF EXISTS lb_item_long_tail;
+CREATE TABLE lb_item_long_tail AS
+SELECT
+    rank_no,
+    item_id,
+    category_id,
+    pv_cnt,
+    pv_uv,
+    buy_cnt,
+    buy_uv,
+    item_conversion_rate,
+    cumulative_pv,
+    total_pv,
+    cumulative_pv_rate,
+    CASE
+        WHEN cumulative_pv_rate <= 0.8 THEN 'head'
+        WHEN cumulative_pv_rate <= 0.95 THEN 'middle'
+        ELSE 'long_tail'
+    END AS tail_segment
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY pv_cnt DESC, buy_cnt DESC, item_id ASC) AS rank_no,
+        item_id,
+        category_id,
+        pv_cnt,
+        pv_uv,
+        buy_cnt,
+        buy_uv,
+        item_conversion_rate,
+        SUM(pv_cnt) OVER (ORDER BY pv_cnt DESC, buy_cnt DESC, item_id ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_pv,
+        SUM(pv_cnt) OVER () AS total_pv,
+        ROUND(
+            CAST(SUM(pv_cnt) OVER (ORDER BY pv_cnt DESC, buy_cnt DESC, item_id ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS DOUBLE)
+                / SUM(pv_cnt) OVER (),
+            4
+        ) AS cumulative_pv_rate
+    FROM lb_item_efficiency
+) ranked;
 
 DROP TABLE IF EXISTS lb_user_features;
 CREATE TABLE lb_user_features AS

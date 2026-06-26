@@ -31,6 +31,11 @@ object SmokeTest {
     "lb_time_low_conversion_slots",
     "lb_category_efficiency",
     "lb_item_efficiency",
+    "lb_category_topn",
+    "lb_item_topn",
+    "lb_category_conversion_rank",
+    "lb_category_low_conversion",
+    "lb_item_long_tail",
     "lb_user_segment_summary"
   )
 
