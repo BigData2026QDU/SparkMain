@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.17" % Test
 )
 
-assembly / mainClass := Some("org.example.Main")
+assembly / mainClass := Some("org.bigdata.Main")
 assembly / assemblyMergeStrategy := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case x => MergeStrategy.first

@@ -1,4 +1,4 @@
-package org.example.streaming
+package org.bigdata.streaming
 
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}

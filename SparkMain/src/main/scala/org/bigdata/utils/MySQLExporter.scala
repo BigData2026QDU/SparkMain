@@ -1,4 +1,4 @@
-package org.example.utils
+package org.bigdata.utils
 
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import java.util.Properties

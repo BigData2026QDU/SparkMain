@@ -1,7 +1,7 @@
-package org.example.analysis
+package org.bigdata.analysis
 
 import org.apache.spark.sql.{DataFrame, SparkSession, SaveMode}
-import org.example.utils.MySQLExporter
+import org.bigdata.utils.MySQLExporter
 import java.util.Properties
 
 /**

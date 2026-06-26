@@ -1,7 +1,7 @@
-package org.example.analysis
+package org.bigdata.analysis
 
 import org.apache.spark.sql.{SparkSession, SaveMode}
-import org.example.utils.MySQLExporter
+import org.bigdata.utils.MySQLExporter
 
 /**
  * 用户行为分析任务

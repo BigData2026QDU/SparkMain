@@ -1,4 +1,4 @@
-package org.example.streaming
+package org.bigdata.streaming
 
 import org.apache.kafka.clients.producer._
 import org.apache.kafka.common.serialization.StringSerializer

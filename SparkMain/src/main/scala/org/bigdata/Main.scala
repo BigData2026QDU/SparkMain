@@ -1,7 +1,7 @@
-package org.example
+package org.bigdata
 
-import org.example.streaming.RatingStreamProcessor
-import org.example.analysis.{AnalyzeRatings, AnalyzeGenres, AnalyzeTime, AnalyzeUsers}
+import org.bigdata.streaming.RatingStreamProcessor
+import org.bigdata.analysis.{AnalyzeRatings, AnalyzeGenres, AnalyzeTime, AnalyzeUsers}
 
 /**
  * 主入口
@@ -11,7 +11,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) {
-      println("用法: spark-submit --class org.example.Main <task>")
+      println("用法: spark-submit --class org.bigdata.Main <task>")
       println("可用任务:")
       println("  stream    - 启动评分数据流处理")
       println("  analyze   - 运行评分分析")
