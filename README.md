@@ -2,16 +2,16 @@
 
 ## 简介
 
-SparkMain 是一个基于 Apache Spark 的大数据处理流水线，使用 MovieLens 电影评分数据集进行分析。本项目提供自动化数据清洗、Hive 建表、数据加载和分析任务执行的完整流程。
+SparkMain 是一个基于 Apache Spark + Scala 的大数据处理流水线，使用 MovieLens 电影评分数据集进行分析。本项目提供自动化数据清洗、分析任务执行的完整流程。
 
 ## 环境要求
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
 | JDK | 17 | Java 开发工具包 |
+| Scala | 2.12 | Scala 开发工具包 |
 | Apache Spark | 3.5.0 | 大数据处理框架 |
-| Hive | 3.1.x | 数据仓库 |
-| Hadoop (HDFS) | - | 分布式文件系统 |
+| sbt | 1.9+ | Scala 构建工具 |
 | Python | 3.8+ | 数据清洗脚本 |
 | Kafka | 3.6+ | 消息队列（实时流处理） |
 
@@ -35,114 +35,124 @@ git submodule update --init --recursive
 python dataset/download_movielens.py
 ```
 
-### 3. 运行流水线
+### 3. 构建项目
+
+```bash
+cd SparkMain
+sbt package
+```
+
+### 4. 运行流水线
 
 **生产模式：**
 
-Linux/Mac：
 ```bash
-chmod +x main_pipeline.sh
-./main_pipeline.sh
-```
-
-Windows：
-```cmd
-main_pipeline.bat
+chmod +x main_pipeline_new.sh
+./main_pipeline_new.sh
 ```
 
 **测试模式：**
 
-Linux/Mac：
 ```bash
 chmod +x main_pipeline_test.sh
 ./main_pipeline_test.sh
-```
-
-Windows：
-```cmd
-main_pipeline_test.bat
 ```
 
 ## 流水线说明
 
 ### 执行流程
 
-流水线自动执行以下 8 个步骤：
-
-| 步骤 | 操作 | 说明 |
-|------|------|------|
-| 1 | 检查/创建 Hive 数据库 | 数据库 `bigdata_ana` 不存在则自动创建 |
-| 2 | 截断大文件 | `truncate_file.py` 将 CSV 截断至 300MB |
-| 3 | 运行清洗脚本 | 执行 `cleanPy/` 目录下所有 Python 脚本 |
-| 4 | 上传至 HDFS | 清理旧数据并上传清洗后的 CSV |
-| 5 | 初始化 Hive 表 | 检查表是否存在，不存在则执行 `initializeSQL/` |
-| 6 | 数据准备 | 执行 `prepareData/` 中的 SQL（创建视图等） |
-| 7 | 执行分析任务 | 执行 `jobSQL/` 目录下所有 SQL 文件 |
-| 8 | 完成标记 | 打印流水线执行完成信息 |
+```
+原始数据 (dataset/)
+    ↓
+Python 清洗脚本 (cleanPy/)
+    ↓
+清洗后数据 (cleanedDataset/)
+    ↓
+Spark 分析任务 (Scala)
+    ↓
+分析结果 (output/)
+```
 
 ### 目录结构
 
 ```
 SparkMain/
-├── dataset/            # 生产数据（MovieLens CSV 文件）
-├── dataset_test/       # 测试数据（轻量级，10-100KB）
-├── truncatedDataset/   # 截断后的数据（自动生成）
-├── cleanedDataset/     # 清洗后的数据（自动生成）
-├── cleanPy/            # 生产清洗脚本
-├── cleanPy_test/       # 测试清洗脚本
-├── initializeSQL/      # 生产建表 SQL
-├── initializeSQL_test/ # 测试建表 SQL
-├── prepareData/        # 生产数据准备 SQL
-├── prepareData_test/   # 测试数据准备 SQL
-├── jobSQL/             # 生产分析任务 SQL
-├── jobSQL_test/        # 测试分析任务 SQL
-├── main_pipeline.sh    # 生产流水线脚本（Linux）
-├── main_pipeline.bat   # 生产流水线脚本（Windows）
-├── main_pipeline_test.sh  # 测试流水线脚本（Linux）
-├── main_pipeline_test.bat # 测试流水线脚本（Windows）
-├── truncate_file.py    # 大文件截断工具
-└── test/               # 测试验证脚本
+├── SparkMain/              # 源代码目录
+│   ├── src/main/scala/org/example/
+│   │   ├── Main.scala              # 主入口
+│   │   ├── streaming/
+│   │   │   ├── RatingStreamProcessor.scala  # Spark Streaming 处理器
+│   │   │   └── RatingProducer.scala         # Kafka 数据生成器
+│   │   └── analysis/
+│   │       ├── AnalyzeRatings.scala         # 评分分析
+│   │       └── AnalyzeGenres.scala          # 类型分析
+│   ├── build.sbt           # Scala 构建配置
+│   └── test/
+├── dataset/                # 原始数据目录
+├── dataset_test/           # 测试数据目录（轻量级）
+├── cleanPy/                # 生产清洗脚本
+├── cleanPy_test/           # 测试清洗脚本
+├── output/                 # 分析结果输出
+├── config/                 # 配置文件
+├── start_streaming.sh      # 启动 Kafka + Spark Streaming
+├── main_pipeline_new.sh    # 新流水线脚本（Spark + Scala）
+├── main_pipeline_test.sh   # 测试流水线脚本
+├── Architecture.md         # 架构文档
+├── README.md               # 项目说明
+├── Workflow.md             # 工作流设计文档
+└── .gitignore              # Git 忽略配置
 ```
 
 ## 如何编写新任务
 
 ### 任务规范
 
-在 `jobSQL/` 目录下创建 SQL 文件，遵循以下规范：
+在 `SparkMain/src/main/scala/org/example/analysis/` 目录下创建 Scala 文件：
 
-1. **文件命名：** `XX_任务名称简述.sql`（XX 为两位数字编号，决定执行顺序）
-   - 示例：`06_task6_hot_movies.sql`
+1. **文件命名：** `Analyze任务名称.scala`
+   - 示例：`AnalyzeMovies.scala`
 
-2. **SQL 文件必须包含：**
-   ```sql
-   SET hive.execution.engine=spark;
-   SET spark.master=local[*];
-   
-   USE bigdata_ana;
-   ```
+2. **Scala 代码模板：**
+```scala
+package org.example.analysis
 
-3. **结果表命名：** `taskN_xxx`（N 为任务编号）
-   - 示例：`task6_hot_movies`
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
 
-4. **SQL 模式：**
-   ```sql
-   SET hive.execution.engine=spark;
-   SET spark.master=local[*];
-   
-   USE bigdata_ana;
-   
-   -- 删除旧结果表（如存在）
-   DROP TABLE IF EXISTS taskN_xxx;
-   
-   -- 创建结果表
-   CREATE TABLE taskN_xxx AS
-   SELECT ...
-   FROM ...
-   WHERE ...;
-   
-   -- 展示结果
-   SELECT * FROM taskN_xxx LIMIT 20;
-   ```
+object AnalyzeMovies {
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .appName("AnalyzeMovies")
+      .getOrCreate()
+
+    // 读取数据
+    val data = spark.read.parquet("output/ratings_streaming")
+
+    // 分析逻辑
+    val result = data.groupBy("movieId")
+      .agg(avg("rating").as("avg_rating"))
+
+    // 输出结果
+    result.show()
+
+    // 保存结果
+    result.write.mode("overwrite").parquet("output/movie_stats")
+
+    spark.stop()
+  }
+}
+```
+
+3. **在 Main.scala 中注册任务：**
+```scala
+case "movies" => AnalyzeMovies.main(args.drop(1))
+```
+
+4. **运行任务：**
+```bash
+spark-submit --class org.example.Main movies SparkMain/target/scala-2.12/sparkmain_2.12-1.0.jar
+```
 
 ### 测试模式
 
@@ -154,50 +164,12 @@ SparkMain/
 |---------|---------|------|
 | `dataset/` | `dataset_test/` | 测试数据 |
 | `cleanPy/` | `cleanPy_test/` | 测试清洗脚本 |
-| `initializeSQL/` | `initializeSQL_test/` | 测试建表 SQL |
-| `prepareData/` | `prepareData_test/` | 测试数据准备 SQL |
-| `jobSQL/` | `jobSQL_test/` | 测试分析任务 SQL |
 
-**编写测试任务：**
-
-1. 在 `jobSQL_test/` 目录下创建测试 SQL 文件
-2. 使用 `bigdata_ana_test` 数据库
-3. 运行测试流水线验证：
+**运行测试：**
 
 ```bash
-# Linux/Mac
 ./main_pipeline_test.sh
-
-# Windows
-main_pipeline_test.bat
 ```
-
-4. 运行验证脚本检查结果：
-
-```bash
-bash test/verify_results.sh
-```
-
-### 可用数据表
-
-流水线初始化后，`bigdata_ana` 数据库中包含以下表：
-
-| 表名 | 字段 | 说明 |
-|------|------|------|
-| `movies` | movieId, title, genres | 电影信息 |
-| `ratings` | userId, movieId, rating, timestamp | 评分数据 |
-| `tags` | userId, movieId, tag, timestamp | 标签数据 |
-| `links` | movieId, imdbId, tmdbId | 外部链接 |
-
-流水线还会创建临时视图 `v_movies_ratings`（JOIN movies 和 ratings）。
-
-### 提交要求
-
-1. SQL 文件放在 `jobSQL/` 目录
-2. 遵循文件命名规范（`XX_taskname.sql`）
-3. 文件开头包含 Spark 引擎设置和 `USE bigdata_ana`
-4. 结果表使用 `taskN_xxx` 命名格式
-5. 本地测试通过后提交
 
 ## 实时流处理
 
@@ -210,7 +182,7 @@ Kafka Topic (ratings)
     ↓
 Spark Structured Streaming
     ↓
-Hive 表 (ratings_streaming)
+Parquet 文件 (output/ratings_streaming)
 ```
 
 ### 启动服务
@@ -226,21 +198,10 @@ chmod +x start_streaming.sh
 ```bash
 # 编译项目
 cd SparkMain
-mvn clean package
+sbt package
 
 # 运行数据生成器
-java -cp target/spark-streaming-kafka-1.0.0.jar org.example.streaming.RatingProducer
-```
-
-### 配置文件
-
-配置文件位于 `config/streaming.properties`：
-
-```properties
-kafka.bootstrap.servers=localhost:9092
-kafka.topic=ratings
-spark.master=local[*]
-streaming.trigger.interval=10 seconds
+spark-submit --class org.example.streaming.RatingProducer target/scala-2.12/sparkmain_2.12-1.0.jar
 ```
 
 ## 项目结构
@@ -248,47 +209,40 @@ streaming.trigger.interval=10 seconds
 ```
 SparkMain/
 ├── SparkMain/              # 源代码目录
-│   ├── src/
-│   │   └── main/
-│   │       └── java/
-│   │           └── org/example/streaming/
-│   │               ├── RatingStreamProcessor.java  # Spark Streaming 处理器
-│   │               └── RatingProducer.java          # Kafka 数据生成器
-│   ├── pom.xml            # Maven 配置
+│   ├── src/main/scala/org/example/
+│   │   ├── Main.scala
+│   │   ├── streaming/
+│   │   │   ├── RatingStreamProcessor.scala
+│   │   │   └── RatingProducer.scala
+│   │   └── analysis/
+│   │       ├── AnalyzeRatings.scala
+│   │       └── AnalyzeGenres.scala
+│   ├── build.sbt
 │   └── test/
-├── config/                # 配置文件
+├── config/
 │   └── streaming.properties
-├── AGENTS/                # 项目规范（submodule）
-├── dataset/               # 生产数据目录
-├── dataset_test/          # 测试数据目录（轻量级）
-├── cleanPy/               # 生产清洗脚本
-├── cleanPy_test/          # 测试清洗脚本
-├── initializeSQL/         # 生产建表 SQL
-├── initializeSQL_test/    # 测试建表 SQL
-├── prepareData/           # 生产数据准备 SQL
-├── prepareData_test/      # 测试数据准备 SQL
-├── jobSQL/                # 生产分析任务 SQL
-├── jobSQL_test/           # 测试分析任务 SQL
-├── test/                  # 测试验证脚本
-├── start_streaming.sh     # 启动 Kafka + Spark Streaming
-├── Architecture.md        # 架构文档
-├── README.md              # 项目说明
-├── File_Index.md          # 文件索引
-├── main_pipeline.sh       # 生产流水线脚本（Linux）
-├── main_pipeline.bat      # 生产流水线脚本（Windows）
-├── main_pipeline_test.sh  # 测试流水线脚本（Linux）
-├── main_pipeline_test.bat # 测试流水线脚本（Windows）
-├── truncate_file.py       # 数据截断工具
-└── .gitignore             # Git 忽略配置
+├── dataset/
+├── dataset_test/
+├── cleanPy/
+├── cleanPy_test/
+├── output/
+├── start_streaming.sh
+├── main_pipeline_new.sh
+├── main_pipeline_test.sh
+├── Architecture.md
+├── README.md
+├── Workflow.md
+└── .gitignore
 ```
 
 ## 贡献指南
 
 1. Fork 本仓库
 2. 新建 `feature/xxx` 或 `hotfix/xxx` 分支
-3. 按照「如何编写新任务」规范添加 SQL 文件
-4. 本地测试流水线执行通过
-5. 提交代码并创建 Pull Request
+3. 按照「如何编写新任务」规范添加 Scala 代码
+4. 运行 `sbt compile` 确保编译通过
+5. 本地测试流水线执行通过
+6. 提交代码并创建 Pull Request
 
 ## 许可证
 
