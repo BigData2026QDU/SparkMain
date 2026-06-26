@@ -16,7 +16,7 @@ bash main_pipeline.sh
 - `lb_funnel_overall`, `lb_funnel_daily`
 - `lb_time_hourly_behavior`, `lb_time_weekday_hour_heatmap`
 - `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail`
-- `lb_user_segments`, `lb_user_segment_summary`, `lb_user_active_day_distribution`, `lb_user_retention`, `lb_repurchase_behavior_depth`
+- `lb_user_segments`, `lb_user_segment_summary`, `lb_user_retention`
 
 ## 测试验证
 
