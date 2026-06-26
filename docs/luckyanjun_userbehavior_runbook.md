@@ -16,6 +16,28 @@ bash main_pipeline.sh
 HIVE_EXECUTION_ENGINE=mr bash main_pipeline.sh
 ```
 
+课程要求 Spark 任务使用 Scala 时，优先使用 `SparkMain/src/main/java/org/example/analysis/` 下的 Scala Spark 作业：
+
+```bash
+cd SparkMain
+mvn -q -DskipTests package
+cd ..
+
+spark-submit \
+  --class org.example.analysis.UserBehaviorCleanJob \
+  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
+  dataset/UserBehavior.csv \
+  /user/hive/bigdata_ana/user_behavior \
+  bigdata_ana
+
+spark-submit \
+  --class org.example.analysis.UserBehaviorFunnelJob \
+  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
+  bigdata_ana \
+  dwd_user_behavior_clean \
+  /user/hive/bigdata_ana
+```
+
 流水线会依次执行：
 
 - `truncate_file.py`：按行截取约 200 MB 原始 CSV 到 `truncatedDataset/`，作为 issue #14 的生产抽样策略。
