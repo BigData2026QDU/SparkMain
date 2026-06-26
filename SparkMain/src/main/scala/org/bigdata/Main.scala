@@ -1,11 +1,8 @@
 package org.bigdata
 
-import org.bigdata.streaming.RatingStreamProcessor
-import org.bigdata.analysis.{AnalyzeRatings, AnalyzeGenres, AnalyzeTime, AnalyzeUsers}
-
 /**
  * 主入口
- * 根据参数执行不同的任务
+ * 工作流协调器
  */
 object Main {
 
@@ -13,21 +10,23 @@ object Main {
     if (args.isEmpty) {
       println("用法: spark-submit --class org.bigdata.Main <task>")
       println("可用任务:")
-      println("  stream    - 启动评分数据流处理")
-      println("  analyze   - 运行评分分析")
-      println("  genres    - 运行类型分析")
-      println("  time      - 运行时间分析")
-      println("  users     - 运行用户行为分析")
+      println("  help    - 显示帮助信息")
       return
     }
 
     args(0) match {
-      case "stream" => RatingStreamProcessor.main(args.drop(1))
-      case "analyze" => AnalyzeRatings.main(args.drop(1))
-      case "genres" => AnalyzeGenres.main(args.drop(1))
-      case "time" => AnalyzeTime.main(args.drop(1))
-      case "users" => AnalyzeUsers.main(args.drop(1))
+      case "help" => printHelp()
       case _ => println(s"未知任务: ${args(0)}")
     }
+  }
+
+  def printHelp(): Unit = {
+    println("SparkMain 工作流")
+    println("================")
+    println("")
+    println("个人任务请使用个人分支运行")
+    println("示例:")
+    println("  git checkout yiyangchen609-web")
+    println("  spark-submit --class org.bigdata.analysis.AnalyzeRatings <jar>")
   }
 }

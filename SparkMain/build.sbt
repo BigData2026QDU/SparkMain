@@ -15,9 +15,3 @@ libraryDependencies ++= Seq(
   "mysql" % "mysql-connector-java" % "8.0.33",
   "org.scalatest" %% "scalatest" % "3.2.17" % Test
 )
-
-assembly / mainClass := Some("org.bigdata.Main")
-assembly / assemblyMergeStrategy := {
-  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
-  case x => MergeStrategy.first
-}
