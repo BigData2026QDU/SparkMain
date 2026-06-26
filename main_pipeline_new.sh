@@ -2,7 +2,10 @@
 
 ################################################################################
 # 大数据分析流水线主脚本（Spark + Scala 版本）
-# 功能：自动化处理数据清洗到分析的全流程
+# 功能：自动化处理从数据清洗到分析的全流程
+# 用法：
+#   ./main_pipeline_new.sh          # 批处理模式
+#   ./main_pipeline_new.sh stream   # 实时处理模式
 ################################################################################
 
 set -e  # 任何命令失败立即退出
@@ -20,6 +23,9 @@ TRUNCATED_DIR="truncatedDataset"
 CLEANED_DIR="cleanedDataset"
 CLEANPY_DIR="cleanPy"
 OUTPUT_DIR="output"
+
+# 模式
+MODE=${1:-"batch"}
 
 ################################################################################
 # 工具函数
@@ -55,7 +61,49 @@ check_directory() {
 }
 
 ################################################################################
-# 主流程
+# 实时处理模式
+################################################################################
+
+if [ "$MODE" = "stream" ]; then
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                   ║"
+    echo "║                   实时数据处理工作流（Kafka + Spark → MySQL）     ║"
+    echo "║                                                                   ║"
+    echo "╚═══════════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    # 环境检查
+    echo "[检查] 检查必要的命令..."
+    check_command spark-submit
+    echo "[成功] 所有命令检查通过"
+
+    # 检查 JAR 文件
+    if [ ! -f "$JAR_PATH" ]; then
+        echo "[错误] JAR 文件不存在: $JAR_PATH"
+        echo "[提示] 请先运行 'sbt package' 构建项目"
+        exit 1
+    fi
+
+    # 检查 MySQL 配置
+    if [ -z "$MYSQL_JDBC_URL" ]; then
+        echo "[警告] MYSQL_JDBC_URL 未设置，将使用默认配置"
+        export MYSQL_JDBC_URL="jdbc:mysql://localhost:3306/bigdata_ana"
+    fi
+
+    echo "[信息] 启动实时数据处理工作流..."
+    echo "[信息] MySQL: $MYSQL_JDBC_URL"
+
+    spark-submit \
+        --class org.bigdata.streaming.RealtimeWorkflow \
+        --master $SPARK_MASTER \
+        $JAR_PATH
+
+    exit 0
+fi
+
+################################################################################
+# 批处理模式（默认）
 ################################################################################
 
 echo ""
@@ -134,7 +182,7 @@ mkdir -p $OUTPUT_DIR
 
 echo "[信息] 运行评分分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeRatings \
+    --class org.bigdata.analysis.AnalyzeRatings \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -146,7 +194,7 @@ echo "[成功] 评分分析完成"
 
 echo "[信息] 运行类型分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeGenres \
+    --class org.bigdata.analysis.AnalyzeGenres \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -158,7 +206,7 @@ echo "[成功] 类型分析完成"
 
 echo "[信息] 运行时间分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeTime \
+    --class org.bigdata.analysis.AnalyzeTime \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -170,7 +218,7 @@ echo "[成功] 时间分析完成"
 
 echo "[信息] 运行用户行为分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeUsers \
+    --class org.bigdata.analysis.AnalyzeUsers \
     --master $SPARK_MASTER \
     $JAR_PATH
 

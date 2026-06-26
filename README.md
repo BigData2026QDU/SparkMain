@@ -79,7 +79,7 @@ Spark 分析任务 (Scala)
 ```
 SparkMain/
 ├── SparkMain/              # 源代码目录
-│   ├── src/main/scala/org/example/
+│   ├── src/main/scala/org/bigdata/
 │   │   ├── Main.scala              # 主入口
 │   │   ├── streaming/
 │   │   │   ├── RatingStreamProcessor.scala  # Spark Streaming 处理器
@@ -108,14 +108,14 @@ SparkMain/
 
 ### 任务规范
 
-在 `SparkMain/src/main/scala/org/example/analysis/` 目录下创建 Scala 文件：
+在 `SparkMain/src/main/scala/org/bigdata/analysis/` 目录下创建 Scala 文件：
 
 1. **文件命名：** `Analyze任务名称.scala`
    - 示例：`AnalyzeMovies.scala`
 
 2. **Scala 代码模板：**
 ```scala
-package org.example.analysis
+package org.bigdata.analysis
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
@@ -151,7 +151,7 @@ case "movies" => AnalyzeMovies.main(args.drop(1))
 
 4. **运行任务：**
 ```bash
-spark-submit --class org.example.Main movies SparkMain/target/scala-2.12/sparkmain_2.12-1.0.jar
+spark-submit --class org.bigdata.Main movies SparkMain/target/scala-2.12/sparkmain_2.12-1.0.jar
 ```
 
 ### 测试模式
@@ -201,7 +201,7 @@ cd SparkMain
 sbt package
 
 # 运行数据生成器
-spark-submit --class org.example.streaming.RatingProducer target/scala-2.12/sparkmain_2.12-1.0.jar
+spark-submit --class org.bigdata.streaming.RatingProducer target/scala-2.12/sparkmain_2.12-1.0.jar
 ```
 
 ## 项目结构
@@ -209,7 +209,7 @@ spark-submit --class org.example.streaming.RatingProducer target/scala-2.12/spar
 ```
 SparkMain/
 ├── SparkMain/              # 源代码目录
-│   ├── src/main/scala/org/example/
+│   ├── src/main/scala/org/bigdata/
 │   │   ├── Main.scala
 │   │   ├── streaming/
 │   │   │   ├── RatingStreamProcessor.scala
