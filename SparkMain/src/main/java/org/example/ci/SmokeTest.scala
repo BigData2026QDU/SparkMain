@@ -1,15 +1,14 @@
 package org.example.ci
 
-import org.apache.spark.sql.{DataFrame, Row, SparkSession, types => T}
+import org.apache.spark.sql.{DataFrame, SparkSession, types => T}
 
 import java.io.File
 import java.nio.file.{Files, Path, Paths}
-import scala.jdk.CollectionConverters._
-import scala.util.{Try, Using}
-import sys.process._
+import scala.collection.JavaConverters._
+import scala.util.Try
 
 /**
- * CI 烟雾测试 —— Spark SQL 管线端到端验证（Scala 实现）。
+ * CI 烟雾测试 —— Spark SQL 管线端到端验证（Scala 2.12 实现）。
  *
  * 通过 spark-submit 执行，符合 SPARK.md 强制规范。
  */
@@ -73,23 +72,26 @@ object SmokeTest {
 
   private def verifyDatasetSize(repoRoot: Path): Unit = {
     val dir = repoRoot.resolve("dataset_test")
-    val files = Using(Files.list(dir)) { stream =>
-      stream.iterator().asScala
+    val stream = Files.list(dir)
+    try {
+      val files = stream.iterator().asScala
         .filter(_.toString.endsWith(".csv"))
         .toList
         .sortBy(_.getFileName.toString)
-    }.get
 
-    if (files.isEmpty) throw new RuntimeException("dataset_test has no CSV files")
+      if (files.isEmpty) throw new RuntimeException("dataset_test has no CSV files")
 
-    val totalBytes = files.map(Files.size).sum
-    println(s"dataset_test files: ${files.map(_.getFileName)}")
-    println(s"dataset_test total bytes: $totalBytes")
+      val totalBytes = files.map(Files.size).sum
+      println(s"dataset_test files: ${files.map(_.getFileName)}")
+      println(s"dataset_test total bytes: $totalBytes")
 
-    if (totalBytes > 64 * 1024)
-      throw new RuntimeException("dataset_test must stay below 64 KiB for CI")
+      if (totalBytes > 64 * 1024)
+        throw new RuntimeException("dataset_test must stay below 64 KiB for CI")
 
-    println("[PASS] Dataset size check passed")
+      println("[PASS] Dataset size check passed")
+    } finally {
+      stream.close()
+    }
   }
 
   // ---- Python 清洗脚本 ----
@@ -100,12 +102,15 @@ object SmokeTest {
       println("[INFO] No cleaner directory, skipping")
       return
     }
-    val scripts = Using(Files.list(cleanerDir)) { stream =>
+    val stream = Files.list(cleanerDir)
+    val scripts = try {
       stream.iterator().asScala
         .filter(_.toString.endsWith(".py"))
         .toList
         .sortBy(_.getFileName.toString)
-    }.get
+    } finally {
+      stream.close()
+    }
 
     if (scripts.isEmpty) {
       println("[INFO] No cleaner scripts found, skipping")
@@ -184,12 +189,15 @@ object SmokeTest {
       return
     }
     println(s"\n[STEP] Running $dirName SQL...")
-    val sqlFiles = Using(Files.list(sqlDir)) { stream =>
+    val stream = Files.list(sqlDir)
+    val sqlFiles = try {
       stream.iterator().asScala
         .filter(_.toString.endsWith(".sql"))
         .toList
         .sortBy(_.getFileName.toString)
-    }.get
+    } finally {
+      stream.close()
+    }
 
     for (sqlFile <- sqlFiles)
       execSqlFile(spark, sqlFile)
@@ -197,7 +205,7 @@ object SmokeTest {
 
   private def execSqlFile(spark: SparkSession, sqlFile: Path): Unit = {
     println(s"[INFO] Executing: ${sqlFile.getFileName}")
-    val text = Files.readString(sqlFile)
+    val text = new String(Files.readAllBytes(sqlFile), "UTF-8")
     for (stmt <- splitStatements(text)) {
       val trimmed = stmt.trim
       if (trimmed.nonEmpty) {
@@ -222,14 +230,14 @@ object SmokeTest {
   private def verifyOutputTables(spark: SparkSession): Unit = {
     println("\n[VERIFY] Checking output tables...")
     val tables = spark.sql("SHOW TABLES")
-    val existing = tables.collectAsList().asScala.map(_.getString(1)).toSet
+    val existing: Set[String] = tables.collect().map(_.getString(1)).toSet
 
     var allPass = true
     for (tableName <- OutputTables.toList.sorted) {
       if (existing.contains(tableName)) {
         val count = spark.sql(s"SELECT COUNT(*) FROM $tableName")
-          .collectAsList().get(0).get(0)
-        if (count.asInstanceOf[Long] > 0) {
+          .collect().head.get(0).asInstanceOf[Long]
+        if (count > 0) {
           println(s"[PASS] Table $tableName: $count rows")
         } else {
           println(s"[FAIL] Table $tableName: 0 rows")
@@ -250,7 +258,7 @@ object SmokeTest {
   /** 按分号拆分 SQL 语句，跳过注释行。 */
   private def splitStatements(sqlText: String): Seq[String] = {
     val buf = new StringBuilder
-    val statements = Seq.newBuilder[String]
+    val statements = scala.collection.mutable.ArrayBuffer.empty[String]
     for (line <- sqlText.split("\n")) {
       val stripped = line.strip
       if (!stripped.startsWith("--")) {
@@ -265,24 +273,28 @@ object SmokeTest {
     }
     val remaining = buf.toString().strip
     if (remaining.nonEmpty) statements += remaining
-    statements.result()
+    statements
   }
 
   private def deleteRecursive(dir: Path): Unit = {
     if (Files.isDirectory(dir)) {
-      Using(Files.walk(dir)) { stream =>
-        stream.iterator().asScala.toList.sortBy(-_.getNameCount).foreach { p =>
+      val stream = Files.walk(dir)
+      try {
+        val paths = stream.iterator().asScala.toList.sortBy(-_.getNameCount)
+        for (p <- paths) {
           try Files.delete(p) catch { case _: Exception => }
         }
+      } finally {
+        stream.close()
       }
     }
   }
 
   private def execProcess(workDir: File, cmd: String*): Unit = {
-    val proc = new ProcessBuilder(cmd: _*)
-      .directory(workDir)
-      .inheritIO()
-      .start()
+    val pb = new java.lang.ProcessBuilder(cmd: _*)
+    pb.directory(workDir)
+    pb.inheritIO()
+    val proc = pb.start()
     val code = proc.waitFor()
     if (code != 0)
       throw new RuntimeException(s"Process failed with code $code: ${cmd.mkString(" ")}")
