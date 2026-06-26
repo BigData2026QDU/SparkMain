@@ -10,11 +10,13 @@
 bash main_pipeline.sh
 ```
 
-如果当前 Hive 的 Spark execution engine 缺少 Scala 运行类，可在同一套代码下临时切换为 MR 执行：
+如果当前 Hive 的 Spark execution engine 不可用，可以临时切换为 MR 执行 SQL 流水线：
 
 ```bash
 HIVE_EXECUTION_ENGINE=mr bash main_pipeline.sh
 ```
+
+## Scala Spark 作业
 
 课程要求 Spark 任务使用 Scala 时，优先使用 `SparkMain/src/main/java/org/example/analysis/` 下的 Scala Spark 作业：
 
@@ -36,7 +38,16 @@ spark-submit \
   bigdata_ana \
   dwd_user_behavior_clean \
   /user/hive/bigdata_ana
+
+spark-submit \
+  --class org.example.analysis.UserBehaviorTimePeakJob \
+  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
+  bigdata_ana \
+  dwd_user_behavior_clean \
+  /user/hive/bigdata_ana
 ```
+
+## 流水线产物
 
 流水线会依次执行：
 
@@ -45,16 +56,17 @@ spark-submit \
 - HDFS 上传：按 CSV 文件名创建表目录，例如 `/user/hive/bigdata_ana/user_behavior/`。
 - `initializeSQL/01_create_tables.sql`：创建 Hive 外部表 `user_behavior`。
 - `prepareData/01_load_data.sql`：生成 `dwd_user_behavior_clean` 和 `v_user_item_day_flags`。
-- `jobSQL/`：执行后续 LuckyAnJun 个人离线分析报表。
+- `jobSQL/`：执行 LuckyAnJun 个人离线分析报表。
 
-## 关键产物
+关键产物：
 
 - `cleanedDataset/user_behavior.csv`
 - `user_behavior`
 - `dwd_user_behavior_clean`
 - `v_user_item_day_flags`
 - `lb_funnel_overall`, `lb_funnel_daily`
-- `lb_time_hourly_behavior`, `lb_time_weekday_hour_heatmap`
+- `lb_time_hourly_behavior`, `lb_time_hour_distribution`, `lb_time_weekday_hour_heatmap`
+- `lb_time_high_conversion_slots`, `lb_time_low_conversion_slots`
 - `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail`
 - `lb_user_segments`, `lb_user_segment_summary`, `lb_user_retention`
 

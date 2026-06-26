@@ -129,24 +129,100 @@ CREATE TABLE lb_time_hourly_behavior AS
 SELECT
     event_date,
     event_hour,
+    MAX(weekday) AS weekday,
     COUNT(CASE WHEN behavior_type = 'pv' THEN 1 END) AS pv,
     COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) AS pv_uv,
     COUNT(CASE WHEN behavior_type = 'fav' THEN 1 END) AS fav_cnt,
     COUNT(CASE WHEN behavior_type = 'cart' THEN 1 END) AS cart_cnt,
     COUNT(CASE WHEN behavior_type = 'buy' THEN 1 END) AS buy_cnt,
-    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv
+    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv,
+    ROUND(
+        CASE
+            WHEN COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) = 0 THEN 0
+            ELSE CAST(COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS DOUBLE)
+                / COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END)
+        END,
+        4
+    ) AS hourly_buy_rate
 FROM dwd_user_behavior_clean
-GROUP BY event_date, event_hour;
+WHERE user_id IS NOT NULL
+  AND event_date IS NOT NULL
+  AND event_date <> 'event_date'
+  AND event_hour BETWEEN 0 AND 23
+  AND weekday BETWEEN 1 AND 7
+  AND behavior_type IN ('pv', 'fav', 'cart', 'buy')
+GROUP BY event_date, event_hour
+HAVING COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) > 0;
+
+DROP TABLE IF EXISTS lb_time_hour_distribution;
+CREATE TABLE lb_time_hour_distribution AS
+SELECT
+    event_hour,
+    COUNT(CASE WHEN behavior_type = 'pv' THEN 1 END) AS pv,
+    COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) AS pv_uv,
+    COUNT(CASE WHEN behavior_type = 'fav' THEN 1 END) AS fav_cnt,
+    COUNT(CASE WHEN behavior_type = 'cart' THEN 1 END) AS cart_cnt,
+    COUNT(CASE WHEN behavior_type = 'buy' THEN 1 END) AS buy_cnt,
+    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv,
+    ROUND(
+        CASE
+            WHEN COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) = 0 THEN 0
+            ELSE CAST(COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS DOUBLE)
+                / COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END)
+        END,
+        4
+    ) AS hourly_buy_rate
+FROM dwd_user_behavior_clean
+WHERE user_id IS NOT NULL
+  AND event_date IS NOT NULL
+  AND event_date <> 'event_date'
+  AND event_hour BETWEEN 0 AND 23
+  AND behavior_type IN ('pv', 'fav', 'cart', 'buy')
+GROUP BY event_hour
+HAVING COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) > 0;
 
 DROP TABLE IF EXISTS lb_time_weekday_hour_heatmap;
 CREATE TABLE lb_time_weekday_hour_heatmap AS
 SELECT
     weekday,
     event_hour,
-    SUM(pv) AS pv,
-    SUM(buy_cnt) AS buy_cnt
+    COUNT(CASE WHEN behavior_type = 'pv' THEN 1 END) AS pv,
+    COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) AS pv_uv,
+    COUNT(CASE WHEN behavior_type = 'buy' THEN 1 END) AS buy_cnt,
+    COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS buy_uv,
+    ROUND(
+        CASE
+            WHEN COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) = 0 THEN 0
+            ELSE CAST(COUNT(DISTINCT CASE WHEN behavior_type = 'buy' THEN user_id END) AS DOUBLE)
+                / COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END)
+        END,
+        4
+    ) AS buy_rate
+FROM dwd_user_behavior_clean
+WHERE user_id IS NOT NULL
+  AND event_date IS NOT NULL
+  AND event_date <> 'event_date'
+  AND event_hour BETWEEN 0 AND 23
+  AND weekday BETWEEN 1 AND 7
+  AND behavior_type IN ('pv', 'fav', 'cart', 'buy')
+GROUP BY weekday, event_hour
+HAVING COUNT(DISTINCT CASE WHEN behavior_type = 'pv' THEN user_id END) > 0;
+
+DROP TABLE IF EXISTS lb_time_high_conversion_slots;
+CREATE TABLE lb_time_high_conversion_slots AS
+SELECT *
 FROM lb_time_hourly_behavior
-GROUP BY weekday, event_hour;
+WHERE pv_uv >= 1
+ORDER BY hourly_buy_rate DESC, buy_uv DESC, pv DESC
+LIMIT 10;
+
+DROP TABLE IF EXISTS lb_time_low_conversion_slots;
+CREATE TABLE lb_time_low_conversion_slots AS
+SELECT *
+FROM lb_time_hourly_behavior
+WHERE pv >= (SELECT AVG(pv) FROM lb_time_hourly_behavior)
+ORDER BY hourly_buy_rate ASC, pv DESC
+LIMIT 10;
 
 DROP TABLE IF EXISTS lb_category_efficiency;
 CREATE TABLE lb_category_efficiency AS
