@@ -29,6 +29,17 @@ check_table_has_data() {
     fi
 }
 
+check_file_exists() {
+    local file_path="$1"
+    if [ -f "$file_path" ]; then
+        echo "[PASS] File exists: $file_path"
+        PASS=$((PASS + 1))
+    else
+        echo "[FAIL] File missing: $file_path"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 echo "=========================================="
 echo "1. Check base tables"
 echo "=========================================="
@@ -76,6 +87,15 @@ check_table_exists "lb_category_efficiency"
 check_table_has_data "lb_category_efficiency"
 check_table_exists "lb_user_segment_summary"
 check_table_has_data "lb_user_segment_summary"
+
+echo ""
+echo "=========================================="
+echo "5. Check realtime analysis artifacts"
+echo "=========================================="
+check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorRealtimeJob.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorReplayProducer.scala"
+check_file_exists "initializeSQL/02_luckyanjun_realtime_mysql.sql"
+check_file_exists "web/luckyanjun_realtime.html"
 
 echo ""
 echo "=========================================="

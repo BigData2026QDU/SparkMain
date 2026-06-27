@@ -226,12 +226,11 @@ chmod +x start_streaming.sh
 ### 生成测试数据
 
 ```bash
-# 编译项目
-cd SparkMain
-mvn clean package
+# 编译 Scala 实时作业
+bash build_user_behavior_realtime.sh
 
-# 运行数据生成器
-java -cp target/spark-streaming-kafka-1.0.0.jar org.example.streaming.RatingProducer
+# 回放历史用户行为日志
+bash replay_user_behavior.sh dataset_test/UserBehavior.csv taobao_behavior localhost:9092 200
 ```
 
 ### 配置文件
@@ -266,14 +265,14 @@ streaming.trigger.interval=10 seconds
 
 ```bash
 bash start_user_behavior_streaming.sh
-bash replay_user_behavior.sh ../dataset_test/UserBehavior.csv taobao_behavior localhost:9092 200
+bash replay_user_behavior.sh dataset_test/UserBehavior.csv taobao_behavior localhost:9092 200
 ```
 
 实时窗口指标包括 PV、近似 UV、收藏数、加购数、购买数、购买用户数、转化率、热门类目/商品和异常预警。
 
 ### 动态展示
 
-`web/luckyanjun_dashboard.html` 提供 5 秒自动刷新的动态报表页面骨架，后端接入 `/api/luckyanjun/*` 接口后即可展示离线和实时结果。
+`web/luckyanjun_realtime.html` 每 5 秒读取 Spark 生成的实时 JSON 快照，展示窗口指标、热门类目、热门商品和异常预警。默认地址为 `http://192.168.211.101:18080/luckyanjun_realtime.html`。
 
 ## 项目结构
 

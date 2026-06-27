@@ -1,116 +1,125 @@
-# LuckyAnJun UserBehavior 运行说明
+# LuckyAnJun UserBehavior 运行手册
 
-## 离线清洗与入库
+## 环境
 
-1. 将淘宝用户行为生产数据放入 `dataset/UserBehavior.csv`。
-2. 在 CentOS 虚拟机启动 HDFS、Hive metastore、HiveServer2 和 Spark。
-3. 在仓库根目录执行：
+最终任务在 CentOS 虚拟机执行，当前验收环境为：
 
-```bash
-bash main_pipeline.sh
-```
+- Hadoop 2.9.2
+- Hive 2.3.7
+- Spark 2.4.6
+- Scala 2.11.12
+- Kafka 2.5.0
+- MySQL 5.7
 
-如果当前 Hive 的 Spark execution engine 不可用，可以临时切换为 MR 执行 SQL 流水线：
+Windows 用于编辑代码、GitHub 管理和访问展示页面。
+
+## 离线任务
+
+将淘宝 `UserBehavior.csv` 放入 `dataset/`，然后在仓库根目录执行：
 
 ```bash
 HIVE_EXECUTION_ENGINE=mr bash main_pipeline.sh
 ```
 
-## Scala Spark 作业
+Scala 分析作业位于
+`SparkMain/src/main/java/org/example/analysis/`，对应 issue #14 至 #18。
+生产结果写入 Hive 数据库 `bigdata_ana`。
 
-课程要求 Spark 任务使用 Scala 时，优先使用 `SparkMain/src/main/java/org/example/analysis/` 下的 Scala Spark 作业：
+主要结果表：
 
-```bash
-cd SparkMain
-mvn -q -DskipTests package
-cd ..
-
-spark-submit \
-  --class org.example.analysis.UserBehaviorCleanJob \
-  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
-  dataset/UserBehavior.csv \
-  /user/hive/bigdata_ana/user_behavior \
-  bigdata_ana
-
-spark-submit \
-  --class org.example.analysis.UserBehaviorFunnelJob \
-  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
-  bigdata_ana \
-  dwd_user_behavior_clean \
-  /user/hive/bigdata_ana
-
-spark-submit \
-  --class org.example.analysis.UserBehaviorTimePeakJob \
-  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
-  bigdata_ana \
-  dwd_user_behavior_clean \
-  /user/hive/bigdata_ana
-
-spark-submit \
-  --class org.example.analysis.UserBehaviorCategoryItemJob \
-  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
-  bigdata_ana \
-  dwd_user_behavior_clean \
-  /user/hive/bigdata_ana
-
-spark-submit \
-  --class org.example.analysis.UserBehaviorSegmentRetentionJob \
-  SparkMain/target/spark-streaming-kafka-1.0.0.jar \
-  bigdata_ana \
-  dwd_user_behavior_clean \
-  /user/hive/bigdata_ana
-```
-
-## 流水线产物
-
-流水线会依次执行：
-
-- `truncate_file.py`：按行截取约 200 MB 原始 CSV 到 `truncatedDataset/`，作为 issue #14 的生产抽样策略。
-- `cleanPy/clean_user_behavior.py`：过滤异常记录，派生时间字段，输出 `cleanedDataset/user_behavior.csv`。
-- HDFS 上传：按 CSV 文件名创建表目录，例如 `/user/hive/bigdata_ana/user_behavior/`。
-- `initializeSQL/01_create_tables.sql`：创建 Hive 外部表 `user_behavior`。
-- `prepareData/01_load_data.sql`：生成 `dwd_user_behavior_clean` 和 `v_user_item_day_flags`。
-- `jobSQL/`：执行 LuckyAnJun 个人离线分析报表。
-
-关键产物：
-
-- `cleanedDataset/user_behavior.csv`
-- `user_behavior`
-- `dwd_user_behavior_clean`
-- `v_user_item_day_flags`
 - `lb_funnel_overall`, `lb_funnel_daily`
-- `lb_time_hourly_behavior`, `lb_time_hour_distribution`, `lb_time_weekday_hour_heatmap`
-- `lb_time_high_conversion_slots`, `lb_time_low_conversion_slots`
-- `lb_category_efficiency`, `lb_item_efficiency`
-- `lb_category_topn`, `lb_item_topn`, `lb_category_conversion_rank`, `lb_category_low_conversion`, `lb_item_long_tail`
-- `lb_user_segments`, `lb_user_segment_summary`, `lb_user_active_day_distribution`
-- `lb_user_retention`, `lb_user_retention_heatmap`, `lb_repurchase_behavior_depth`
+- `lb_time_hourly_behavior`, `lb_time_weekday_hour_heatmap`
+- `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail`
+- `lb_user_segments`, `lb_user_segment_summary`
+- `lb_user_retention`, `lb_user_retention_heatmap`
 
-## 测试验证
+## 实时任务
 
-测试数据位于 `dataset_test/UserBehavior.csv`，保持 KB 级，适合 CI 和本地虚拟机快速跑通流程。
+实时任务对应 issue #19。它把历史日志逐条回放到 Kafka，并保留原始事件
+时间，因此答辩时应表述为“历史日志实时回放模拟”，不能表述为接入淘宝官方
+实时数据。
+
+### 1. 配置 MySQL
 
 ```bash
-bash main_pipeline_test.sh
-bash test/verify_results.sh
+export MYSQL_USER=root
+export MYSQL_PASSWORD='你的密码'
 ```
 
-测试清洗脚本不强制 15000 行规模门槛；生产清洗脚本默认强制不少于 15000 行，并限制输出不超过 500 MB。
-
-## 实时分析
-
-实时模块使用历史日志回放模拟 Kafka 流，不表示接入淘宝官方实时流。
+可选配置：
 
 ```bash
-cd SparkMain
-mvn -q -DskipTests package
-cd ..
+export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+export KAFKA_USER_BEHAVIOR_TOPIC=taobao_behavior
+export USER_BEHAVIOR_CHECKPOINT=/tmp/spark/checkpoints/luckyanjun_user_behavior
+export REALTIME_WEB_PORT=18080
+```
+
+### 2. 启动实时分析
+
+```bash
 bash start_user_behavior_streaming.sh
-bash replay_user_behavior.sh dataset_test/UserBehavior.csv taobao_behavior localhost:9092 200
 ```
 
-## 答辩说明
+脚本会启动 ZooKeeper 和 Kafka、创建 topic 和 MySQL 表、编译 Scala 作业、
+启动动态页面服务，然后运行 Spark Structured Streaming。Spark 2.4.6 所需
+Kafka connector 由 `spark-submit --packages` 加载。
 
-- 本模块是 LuckyAnJun 个人独立任务，只使用 `UserBehavior.csv`。
-- `buy` 表示购买行为次数，不代表订单金额或销售额。
-- 后续正式分析需要提交到 CentOS 虚拟机中的 Hadoop/Hive/Spark/Kafka 环境执行；Windows 只用于编辑代码、GitHub 管理和页面访问。
+### 3. 回放数据
+
+另开一个终端执行：
+
+```bash
+bash replay_user_behavior.sh \
+  dataset_test/UserBehavior.csv \
+  taobao_behavior \
+  localhost:9092 \
+  200
+```
+
+第 4 个参数是每条消息之间的毫秒延迟。可添加第 5 个参数限制回放行数；
+`0` 表示回放全部数据。
+
+### 4. 查看结果
+
+MySQL 表：
+
+- `lb_realtime_window_metrics`
+- `lb_realtime_category_top10`
+- `lb_realtime_item_top10`
+- `lb_realtime_category_stats`
+- `lb_realtime_item_stats`
+
+页面：
+
+```text
+http://192.168.211.101:18080/luckyanjun_realtime.html
+```
+
+页面每 5 秒读取 Spark 更新的 `web/data/realtime.json`，展示 5 分钟窗口指标、
+热门类目、热门商品和异常预警。
+
+### 5. 重新验收
+
+需要从头重新处理时，使用新的 checkpoint 路径，或在确认实时任务已经停止后
+删除旧 checkpoint。MySQL 的 `lb_realtime_batches` 使用 checkpoint 和
+batch ID 保证重试幂等。
+
+## 指标边界
+
+- `buy` 表示购买行为次数，不表示订单金额、销售额或 GMV。
+- UV 通过窗口内用户去重获得，结果字段沿用验收名称 `approx_uv`。
+- 浏览到购买转化率为购买用户数除以浏览用户数。
+- 热门类目和商品按窗口内行为总数排序，购买数作为次级排序依据。
+- 异常规则覆盖流量突增、流量骤降、低流量和低转化。
+
+## 测试
+
+轻量数据位于 `dataset_test/UserBehavior.csv`。静态聚合测试：
+
+```bash
+bash test_user_behavior_realtime.sh
+```
+
+静态聚合测试和集成验收都必须在虚拟机执行；集成验收还需实际启动 Kafka、
+Spark 和 MySQL，并查询上述三张核心结果表。

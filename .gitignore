@@ -8,6 +8,9 @@ target/
 build/
 *.class
 *.jar
+!SparkMain/lib/
+!SparkMain/lib/spark-sql-kafka-0-10_2.11-2.4.6.jar
+!SparkMain/lib/kafka-clients-2.0.0.jar
 
 # 日志文件
 *.log

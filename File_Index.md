@@ -12,6 +12,9 @@
 | main_pipeline_test.sh | Linux测试流水线脚本 | 使用轻量测试数据验证流水线 |
 | replay_user_behavior.sh | Kafka回放脚本 | 回放淘宝用户行为测试数据 |
 | start_user_behavior_streaming.sh | 实时分析启动脚本 | 启动 LuckyAnJun 用户行为实时统计 |
+| build_user_behavior_realtime.sh | Scala构建脚本 | 按虚拟机 Spark/Scala 版本编译 issue #19 |
+| test_user_behavior_realtime.sh | Scala测试脚本 | 执行 5 分钟窗口与热门对象 smoke test |
+| initializeSQL/02_luckyanjun_realtime_mysql.sql | MySQL初始化 | 创建实时窗口、Top10 和幂等批次表 |
 | .gitignore | Git忽略配置 | 忽略IDE、构建产物等 |
 | .gitmodules | Git submodule配置 | AGENTS submodule配置 |
 
@@ -29,6 +32,9 @@
 | docs/luckyanjun_userbehavior_data_dictionary.md | 数据字典 | 字段、清洗规则和边界说明 |
 | docs/luckyanjun_userbehavior_runbook.md | 运行说明 | 离线、测试和实时运行步骤 |
 | web/luckyanjun_dashboard.html | 动态页面骨架 | 5 秒刷新接口数据 |
+| web/luckyanjun_realtime.html | 实时监控页面 | 每 5 秒刷新窗口指标、Top10 和预警 |
+| SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorRealtimeJob.scala | Scala实时作业 | Kafka 5 分钟窗口聚合并写入 MySQL |
+| SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorReplayProducer.scala | Scala回放器 | 将历史 CSV 逐条发送到 Kafka |
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorCleanJob.scala | Scala Spark 清洗作业 | 清洗 `UserBehavior.csv` 并生成 Hive 明细表 |
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorFunnelJob.scala | Scala Spark 漏斗作业 | 生成 #15 整体和每日漏斗结果表 |
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorTimePeakJob.scala | Scala Spark 时段分析作业 | 生成 #16 日期小时、24 小时分布、星期小时热力图和高低转化时段结果表 |
