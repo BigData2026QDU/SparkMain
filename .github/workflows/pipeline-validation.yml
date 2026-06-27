@@ -1,0 +1,84 @@
+name: Pipeline Validation
+
+on:
+  push:
+    branches:
+      - main
+      - yiyangchen609-web
+      - "codex/**"
+  pull_request:
+    branches:
+      - main
+      - yiyangchen609-web
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SPARKMAIN_TEST_MODE: "true"
+  MYSQL_ENABLED: "false"
+  MYSQL_JDBC_URL: "jdbc:h2:mem:sparkmain_test;DB_CLOSE_DELAY=-1"
+  MYSQL_TABLE: "realtime_stats_test"
+  SPARK_LOCAL_IP: "127.0.0.1"
+
+jobs:
+  static-checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate scripts and test data
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n main_pipeline_new.sh
+          bash -n main_pipeline_test.sh
+          bash -n test/verify_results.sh
+          python -m py_compile \
+            truncate_file.py \
+            dataset/download_movielens.py \
+            cleanPy/clean_ratings.py \
+            cleanPy_test/clean_ratings.py
+
+          test_files=(dataset_test/*.csv)
+          test "${#test_files[@]}" -gt 0
+          total_bytes=$(du -cb "${test_files[@]}" | tail -1 | cut -f1)
+          test "$total_bytes" -le 65536
+
+  spark-tests:
+    name: sbt and realtime analysis tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: sbt
+          cache-dependency-path: SparkMain/build.sbt
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Compile and test
+        working-directory: SparkMain
+        run: sbt -batch clean test
