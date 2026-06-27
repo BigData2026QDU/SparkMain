@@ -12,7 +12,7 @@ set -e  # 任何命令失败立即退出
 ################################################################################
 PYTHON_CMD="python3"
 SPARK_MASTER="local[*]"
-JAR_PATH="SparkMain/target/scala-2.12/sparkmain_2.12-1.0.jar"
+JAR_PATH="${JAR_PATH:-SparkMain/target/scala-2.12/sparkmain_2.12-1.0.0.jar}"
 
 # 目录定义
 DATASET_DIR="dataset"
@@ -134,7 +134,7 @@ mkdir -p $OUTPUT_DIR
 
 echo "[信息] 运行评分分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeRatings \
+    --class org.bigdata.analysis.AnalyzeRatings \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -146,7 +146,7 @@ echo "[成功] 评分分析完成"
 
 echo "[信息] 运行类型分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeGenres \
+    --class org.bigdata.analysis.AnalyzeGenres \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -158,7 +158,7 @@ echo "[成功] 类型分析完成"
 
 echo "[信息] 运行时间分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeTime \
+    --class org.bigdata.analysis.AnalyzeTime \
     --master $SPARK_MASTER \
     $JAR_PATH
 
@@ -170,7 +170,7 @@ echo "[成功] 时间分析完成"
 
 echo "[信息] 运行用户行为分析..."
 spark-submit \
-    --class org.example.analysis.AnalyzeUsers \
+    --class org.bigdata.analysis.AnalyzeUsers \
     --master $SPARK_MASTER \
     $JAR_PATH
 

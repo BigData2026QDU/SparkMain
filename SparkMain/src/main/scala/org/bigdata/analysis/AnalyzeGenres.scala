@@ -39,7 +39,7 @@ object AnalyzeGenres {
         ROUND(AVG(r.rating), 2) as avg_rating
       FROM movies m
       JOIN ratings r ON m.movieId = r.movieId
-      LATERAL VIEW EXPLODE(SPLIT(m.genres, '\\\\|')) t AS genre
+      LATERAL VIEW EXPLODE(SPLIT(m.genres, '\\|')) t AS genre
       GROUP BY genre
       ORDER BY movie_count DESC
     """)
