@@ -9,11 +9,22 @@ object MySQLExporter {
     val props = new Properties()
     props.setProperty("user", user)
     props.setProperty("password", password)
-    props.setProperty("driver", "com.mysql.cj.jdbc.Driver")
+    props.setProperty(
+      "driver",
+      sys.env.getOrElse("MYSQL_DRIVER", "com.mysql.cj.jdbc.Driver"))
     props
   }
 
   def exportToMySQL(df: DataFrame, tableName: String, jdbcUrl: String, props: Properties): Unit = {
     df.write.mode(SaveMode.Overwrite).jdbc(jdbcUrl, tableName, props)
+  }
+
+  def exportToMySQL(
+      df: DataFrame,
+      tableName: String,
+      jdbcUrl: String,
+      props: Properties,
+      saveMode: SaveMode): Unit = {
+    df.write.mode(saveMode).jdbc(jdbcUrl, tableName, props)
   }
 }

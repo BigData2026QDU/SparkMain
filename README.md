@@ -5,9 +5,10 @@ The shared project workflow belongs on the `main` branch.
 
 ## Scope
 
-This branch is responsible for offline analysis jobs built on top of the shared
-workflow output. It does not own Kafka, streaming infrastructure, web pages, or
-deployment scripts for the whole project.
+This branch is responsible for personal analysis jobs built on top of the shared
+workflow output. It may contain personal realtime analysis tasks, but it does not
+own shared Kafka infrastructure, web pages, or deployment scripts for the whole
+project.
 
 Shared workflow responsibility:
 
@@ -18,7 +19,7 @@ main branch: Kafka + Spark Streaming + MySQL workflow infrastructure
 Personal task responsibility:
 
 ```text
-yiyangchen609-web branch: Spark analysis tasks and result tables
+yiyangchen609-web branch: Spark analysis tasks, personal realtime task, and result tables
 ```
 
 ## Requirements
@@ -170,6 +171,52 @@ Metrics:
 - user rating preference bucket
 - rating distribution and percentage
 
+### `realtime`
+
+Class:
+
+```text
+org.bigdata.streaming.PersonalRealtimeRatings
+```
+
+Default validation source:
+
+```text
+dataset_test/realtime_ratings
+```
+
+Outputs:
+
+```text
+output/personal_realtime/metrics
+output/personal_realtime/top_movies
+output/personal_realtime/alerts
+```
+
+Metrics:
+
+- 5-minute rating count
+- active user count
+- active movie count
+- average, max, and min rating
+- realtime Top10 movies by rating count
+- low/high average rating alerts
+
+The task supports two sources:
+
+```bash
+# VM/local validation without Kafka
+export REALTIME_SOURCE=file
+export REALTIME_INPUT_PATH=dataset_test/realtime_ratings
+
+# Kafka mode for integration with the shared workflow
+export REALTIME_SOURCE=kafka
+export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+export KAFKA_TOPIC=ratings
+export KAFKA_STARTING_OFFSETS=earliest
+export SPARK_SUBMIT_PACKAGES=org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.6
+```
+
 ## Build
 
 ```bash
@@ -208,6 +255,13 @@ analyze
 genres
 time
 users
+realtime
+```
+
+Run the personal realtime validation task:
+
+```bash
+./run_personal_realtime.sh
 ```
 
 ## MySQL Export
@@ -216,9 +270,22 @@ Each analysis task writes Parquet output first. If MySQL environment variables
 are provided, the same DataFrame is also exported to MySQL.
 
 ```bash
-export MYSQL_JDBC_URL="jdbc:mysql://192.168.56.1:3306/sparkmain_results?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
-export MYSQL_USER="root"
-export MYSQL_PASSWORD="root"
+export MYSQL_JDBC_URL="jdbc:mysql://<mysql-host>:3306/sparkmain_results?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
+export MYSQL_USER="<mysql-user>"
+export MYSQL_PASSWORD="<mysql-password>"
+# Use this on the VM if only mysql-connector-java 5.1.x is available.
+export MYSQL_DRIVER="com.mysql.jdbc.Driver"
+export SPARK_SUBMIT_JARS="/usr/local/hive-2.3.10/lib/mysql-connector-java-5.1.47.jar"
+```
+
+For repeatable VM validation, use test table names and clean them before each
+run:
+
+```bash
+export MYSQL_CLEAN_TABLES=true
+export MYSQL_REALTIME_METRICS_TABLE=realtime_rating_metrics_kafka_test
+export MYSQL_REALTIME_TOP_MOVIES_TABLE=realtime_top_movies_kafka_test
+export MYSQL_REALTIME_ALERTS_TABLE=realtime_rating_alerts_kafka_test
 ```
 
 Tables written by this branch:
@@ -231,6 +298,9 @@ weekday_stats
 user_activity
 user_preference
 rating_distribution
+realtime_rating_metrics
+realtime_top_movies
+realtime_rating_alerts
 ```
 
 ## Test Data
@@ -247,7 +317,7 @@ and suitable for CI or local smoke tests.
 
 Do not add shared workflow infrastructure to this branch. In particular:
 
-- no Kafka producer/consumer workflow ownership
+- no shared Kafka producer/consumer workflow ownership
 - no shared realtime workflow ownership
 - no web frontend or web deployment work
 

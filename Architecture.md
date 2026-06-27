@@ -35,3 +35,32 @@
 
 - 本地开发环境
 - Hadoop集群环境
+## 6. Personal realtime analysis
+
+The `yiyangchen609-web` branch contains a personal realtime rating analysis task. It is separate from the shared realtime workflow infrastructure on the `main` branch.
+
+Data flow:
+
+```text
+Kafka topic ratings_personal_realtime
+  -> Spark Structured Streaming
+  -> 5-minute rating window metrics
+  -> Parquet output/personal_realtime*
+  -> MySQL sparkmain_results realtime_* tables
+```
+
+Main runtime class:
+
+```text
+org.bigdata.streaming.PersonalRealtimeRatings
+```
+
+Outputs:
+
+```text
+realtime_rating_metrics
+realtime_top_movies
+realtime_rating_alerts
+```
+
+For local and VM smoke validation, the same task can replay `dataset_test/realtime_ratings` through a file stream. Strict realtime verification uses `REALTIME_SOURCE=kafka`.

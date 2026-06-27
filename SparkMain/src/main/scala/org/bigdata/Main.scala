@@ -1,6 +1,7 @@
 package org.bigdata
 
 import org.bigdata.analysis.{AnalyzeGenres, AnalyzeRatings, AnalyzeTime, AnalyzeUsers}
+import org.bigdata.streaming.PersonalRealtimeRatings
 
 /**
  * Personal analysis task entry point.
@@ -15,6 +16,7 @@ object Main {
       println("  genres    - run genre rating statistics")
       println("  time      - run time-based rating statistics")
       println("  users     - run user behavior analysis")
+      println("  realtime  - run personal realtime rating analysis")
       return
     }
 
@@ -23,6 +25,7 @@ object Main {
       case "genres" => AnalyzeGenres.main(args.drop(1))
       case "time" => AnalyzeTime.main(args.drop(1))
       case "users" => AnalyzeUsers.main(args.drop(1))
+      case "realtime" => PersonalRealtimeRatings.main(args.drop(1))
       case _ => println(s"Unknown task: ${args(0)}")
     }
   }

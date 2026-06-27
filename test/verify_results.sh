@@ -46,6 +46,7 @@ check_directory_exists "SparkMain/src/main/scala/org/bigdata"
 check_file_exists "SparkMain/build.sbt"
 check_file_exists "main_pipeline_new.sh"
 check_file_exists "main_pipeline_test.sh"
+check_file_exists "run_personal_realtime.sh"
 
 echo ""
 echo "=========================================="
@@ -57,20 +58,28 @@ check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeRatings.
 check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeGenres.scala"
 check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeTime.scala"
 check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeUsers.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/PersonalRealtimeRatings.scala"
 
 echo ""
 echo "=========================================="
-echo "3. MySQL export support"
+echo "3. Realtime test input"
+echo "=========================================="
+
+check_directory_exists "dataset_test/realtime_ratings"
+check_file_exists "dataset_test/realtime_ratings/ratings_batch_1.csv"
+
+echo ""
+echo "=========================================="
+echo "4. MySQL export support"
 echo "=========================================="
 
 check_file_exists "SparkMain/src/main/scala/org/bigdata/utils/MySQLExporter.scala"
 
 echo ""
 echo "=========================================="
-echo "4. Personal branch boundary"
+echo "5. Personal branch boundary"
 echo "=========================================="
 
-check_path_absent "SparkMain/src/main/scala/org/bigdata/streaming"
 check_path_absent "config/streaming.properties"
 
 echo ""

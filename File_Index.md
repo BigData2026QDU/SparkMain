@@ -28,3 +28,10 @@
 | AGENTS/PROJECT/PROJECT.md | 全项目通用规范 | 技术栈、目录结构、文档要求 |
 | AGENTS/PROJECT/BACKEND.md | 后端开发规范 | Java、Spark、测试规范 |
 | AGENTS/PROJECT/FRONTEND.md | 前端开发规范 | 前端开发规范 |
+## Personal realtime analysis
+
+| File path | Role | Description |
+|---------|------|------|
+| SparkMain/src/main/scala/org/bigdata/streaming/PersonalRealtimeRatings.scala | Personal realtime Spark task | Consumes rating events from Kafka or file stream, computes 5-minute metrics, Top movies, and alerts, then writes Parquet and optional MySQL tables. |
+| run_personal_realtime.sh | Realtime validation runner | Runs the personal realtime task with guarded output cleanup, optional Spark packages/jars, and optional test table cleanup. |
+| dataset_test/realtime_ratings/ratings_batch_1.csv | Realtime smoke input | Small CSV batch used by file-stream validation and Kafka producer replay. |
