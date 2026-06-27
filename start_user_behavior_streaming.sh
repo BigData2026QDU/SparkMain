@@ -17,6 +17,8 @@ MYSQL_HOST="${MYSQL_HOST:-localhost}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
+MYSQL_DATABASE="${MYSQL_DATABASE:-bigdata_ana}"
+MYSQL_CREATE_DATABASE="${MYSQL_CREATE_DATABASE:-true}"
 WEB_PORT="${REALTIME_WEB_PORT:-18080}"
 JAR_PATH="${USER_BEHAVIOR_JAR:-$ROOT_DIR/SparkMain/target/userbehavior-realtime.jar}"
 
@@ -76,7 +78,19 @@ MYSQL_ARGS=(-h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER")
 if [ -n "$MYSQL_PASSWORD" ]; then
     MYSQL_ARGS+=("-p$MYSQL_PASSWORD")
 fi
-mysql "${MYSQL_ARGS[@]}" < "$ROOT_DIR/initializeSQL/02_luckyanjun_realtime_mysql.sql"
+
+if mysql "${MYSQL_ARGS[@]}" "$MYSQL_DATABASE" -e "SELECT 1" >/dev/null 2>&1; then
+    echo "[INFO] MySQL database is accessible: $MYSQL_DATABASE"
+elif [ "$MYSQL_CREATE_DATABASE" = "true" ]; then
+    mysql "${MYSQL_ARGS[@]}" -e \
+        "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+else
+    echo "[ERROR] MySQL database is not accessible: $MYSQL_DATABASE"
+    exit 1
+fi
+
+mysql "${MYSQL_ARGS[@]}" "$MYSQL_DATABASE" \
+    < "$ROOT_DIR/initializeSQL/02_luckyanjun_realtime_mysql.sql"
 
 bash "$ROOT_DIR/build_user_behavior_realtime.sh"
 
@@ -104,7 +118,7 @@ if [ "${START_REALTIME_WEB:-true}" = "true" ]; then
     echo "[INFO] Dashboard: http://$(hostname -I | awk '{print $1}'):$WEB_PORT/luckyanjun_realtime.html"
 fi
 
-export MYSQL_JDBC_URL="${MYSQL_JDBC_URL:-jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/bigdata_ana?useUnicode=true&characterEncoding=utf8&useSSL=false}"
+export MYSQL_JDBC_URL="${MYSQL_JDBC_URL:-jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&useSSL=false&rewriteBatchedStatements=true}"
 export MYSQL_USER
 export MYSQL_PASSWORD
 export REALTIME_SNAPSHOT_PATH="${REALTIME_SNAPSHOT_PATH:-$ROOT_DIR/web/data/realtime.json}"

@@ -99,6 +99,31 @@ http://192.168.211.101:18080/luckyanjun_realtime.html
 页面每 5 秒读取 Spark 更新的 `web/data/realtime.json`，展示 5 分钟窗口指标、
 热门类目、热门商品和异常预警。
 
+## 共享 MySQL
+
+虚拟机不能直接访问公网 MySQL 时，先在 Windows 建立反向隧道：
+
+```powershell
+ssh -N -R 13306:47.104.27.184:3306 master@192.168.211.101
+```
+
+虚拟机通过 `127.0.0.1:13306/test_db` 访问共享数据库。密码只保存在权限为
+`600` 的 `/home/master/.sparkmain_mysql.env`，不能提交到 Git。
+
+导出 17 张离线展示表：
+
+```bash
+bash export_user_behavior_mysql.sh
+```
+
+启动写入共享数据库的实时任务：
+
+```bash
+bash start_user_behavior_streaming_remote.sh
+```
+
+共享表契约见 `docs/luckyanjun_mysql_contract.md`。
+
 ### 5. 重新验收
 
 需要从头重新处理时，使用新的 checkpoint 路径，或在确认实时任务已经停止后

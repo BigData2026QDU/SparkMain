@@ -27,11 +27,12 @@ KAFKA_CP="$(printf "%s:" "$KAFKA_HOME"/libs/*.jar)"
     -classpath "$SPARK_CP$KAFKA_CP" \
     -d "$CLASSES_DIR" \
     "$ROOT_DIR/SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorRealtimeJob.scala" \
-    "$ROOT_DIR/SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorReplayProducer.scala"
+    "$ROOT_DIR/SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorReplayProducer.scala" \
+    "$ROOT_DIR/SparkMain/src/main/scala/org/bigdata/export/UserBehaviorMySQLExportJob.scala"
 
 (
     cd "$CLASSES_DIR"
-    jar cf "$JAR_PATH" org/bigdata/streaming/*.class
+    jar cf "$JAR_PATH" org/bigdata/streaming/*.class org/bigdata/export/*.class
 )
 
 echo "[SUCCESS] Built $JAR_PATH"

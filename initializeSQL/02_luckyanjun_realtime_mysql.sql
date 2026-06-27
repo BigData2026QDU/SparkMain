@@ -1,9 +1,3 @@
-CREATE DATABASE IF NOT EXISTS bigdata_ana
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE bigdata_ana;
-
 CREATE TABLE IF NOT EXISTS lb_realtime_batches (
   checkpoint_key VARCHAR(255) NOT NULL,
   batch_id BIGINT NOT NULL,

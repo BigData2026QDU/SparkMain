@@ -1,6 +1,7 @@
 package org.bigdata
 
 import org.bigdata.streaming.{RealtimeWorkflow, UserBehaviorRealtimeJob, UserBehaviorReplayProducer}
+import org.bigdata.export.UserBehaviorMySQLExportJob
 
 /**
  * 主入口
@@ -15,6 +16,7 @@ object Main {
       println("  realtime  - 启动实时数据处理（Kafka → MySQL）")
       println("  user-realtime - 启动淘宝用户行为 5 分钟实时分析")
       println("  user-replay   - 回放淘宝历史用户行为日志到 Kafka")
+      println("  user-export   - 导出淘宝用户行为 Hive 汇总表到 MySQL")
       println("  help      - 显示帮助信息")
       return
     }
@@ -23,6 +25,7 @@ object Main {
       case "realtime" => RealtimeWorkflow.main(args.drop(1))
       case "user-realtime" => UserBehaviorRealtimeJob.main(args.drop(1))
       case "user-replay" => UserBehaviorReplayProducer.main(args.drop(1))
+      case "user-export" => UserBehaviorMySQLExportJob.main(args.drop(1))
       case "help" => printHelp()
       case _ => println(s"未知任务: ${args(0)}")
     }

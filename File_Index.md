@@ -14,6 +14,8 @@
 | start_user_behavior_streaming.sh | 实时分析启动脚本 | 启动 LuckyAnJun 用户行为实时统计 |
 | build_user_behavior_realtime.sh | Scala构建脚本 | 按虚拟机 Spark/Scala 版本编译 issue #19 |
 | test_user_behavior_realtime.sh | Scala测试脚本 | 执行 5 分钟窗口与热门对象 smoke test |
+| export_user_behavior_mysql.sh | 离线结果导出脚本 | 将 17 张 Hive 汇总表原子发布到 MySQL |
+| start_user_behavior_streaming_remote.sh | 远程实时启动脚本 | 从受保护凭据文件读取密码并写入共享 MySQL |
 | initializeSQL/02_luckyanjun_realtime_mysql.sql | MySQL初始化 | 创建实时窗口、Top10 和幂等批次表 |
 | .gitignore | Git忽略配置 | 忽略IDE、构建产物等 |
 | .gitmodules | Git submodule配置 | AGENTS submodule配置 |
@@ -31,6 +33,8 @@
 | jobSQL/09_luckyanjun_user_segment_retention.sql | 离线报表 | 用户分层、留存与短期复购 |
 | docs/luckyanjun_userbehavior_data_dictionary.md | 数据字典 | 字段、清洗规则和边界说明 |
 | docs/luckyanjun_userbehavior_runbook.md | 运行说明 | 离线、测试和实时运行步骤 |
+| docs/luckyanjun_mysql_contract.md | MySQL数据契约 | 前后端表名、字段、行数和接口映射 |
+| SparkMain/src/main/scala/org/bigdata/export/UserBehaviorMySQLExportJob.scala | Scala导出作业 | Hive 汇总结果经 staging 校验后发布到 MySQL |
 | web/luckyanjun_dashboard.html | 动态页面骨架 | 5 秒刷新接口数据 |
 | web/luckyanjun_realtime.html | 实时监控页面 | 每 5 秒刷新窗口指标、Top10 和预警 |
 | SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorRealtimeJob.scala | Scala实时作业 | Kafka 5 分钟窗口聚合并写入 MySQL |
