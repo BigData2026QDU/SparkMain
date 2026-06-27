@@ -32,6 +32,8 @@
 | jobSQL/08_luckyanjun_category_item_efficiency.sql | 离线报表 | 类目和商品转化效率 |
 | jobSQL/09_luckyanjun_user_segment_retention.sql | 离线报表 | 用户分层、留存与短期复购 |
 | docs/luckyanjun_userbehavior_data_dictionary.md | 数据字典 | 字段、清洗规则和边界说明 |
+| docs/luckyanjun_rawdata_dictionary.md | 原始数据字典 | 原始数据集字段定义、质量报告与分布统计 |
+| docs/luckyanjun_dataset_statistics.md | 数据集统计报告 | 全量数据集统计（原始/截断/测试/清洗/结果表） |
 | docs/luckyanjun_userbehavior_runbook.md | 运行说明 | 离线、测试和实时运行步骤 |
 | docs/luckyanjun_mysql_contract.md | MySQL数据契约 | 前后端表名、字段、行数和接口映射 |
 | SparkMain/src/main/scala/org/bigdata/export/UserBehaviorMySQLExportJob.scala | Scala导出作业 | Hive 汇总结果经 staging 校验后发布到 MySQL |
