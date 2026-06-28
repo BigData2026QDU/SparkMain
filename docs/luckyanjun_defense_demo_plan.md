@@ -78,7 +78,7 @@
 - 图表只展示 `pv_cnt` 和 `category_conversion_rate`，避免报表过乱。
 - 类目 4756105 的 PV 最高，为 278528，转化率为 5.78%；类目 4145813 的 PV 第二，为 184965，转化率为 7.77%。
 
-### 2.4 #18 用户分层、留存与短期复购
+### 2.4 #18 活跃天数分布
 
 代码入口：
 
@@ -87,11 +87,7 @@
 
 结果表：
 
-- `lb_user_segment_summary`
 - `lb_user_active_day_distribution`
-- `lb_user_retention`
-- `lb_user_retention_heatmap`
-- `lb_repurchase_behavior_depth`
 
 网站报告：
 
@@ -99,9 +95,9 @@
 
 讲解重点：
 
-- 用户分层只基于行为数据，不包含性别、年龄、城市等画像字段。
-- 短期复购用户占 37.41%，高活跃用户占 12.20%。
-- 留存分析受 2017-11-25 至 2017-12-03 数据窗口限制，不能把后期 7 日留存为 0 解释成真实流失。
+- 报表只保留“二、活跃天数分布”，横轴 `active_days` 按 1-9 递增展示。
+- 活跃 9 天用户最多，为 14570 人，占 26.09%；活跃 8 天用户为 11667 人，占 20.89%。
+- 重点说明活跃天数越高，平均行为数和平均购买次数整体更高。
 
 ## 3. 批处理结果核验命令
 
@@ -112,7 +108,7 @@ mysql -h 47.104.27.184 -P 3306 -u test -p test_db -e "
 SELECT 'lb_funnel_overall' AS table_name, COUNT(*) AS rows_cnt FROM lb_funnel_overall
 UNION ALL SELECT 'lb_time_hour_distribution', COUNT(*) FROM lb_time_hour_distribution
 UNION ALL SELECT 'lb_category_topn', COUNT(*) FROM lb_category_topn
-UNION ALL SELECT 'lb_user_segment_summary', COUNT(*) FROM lb_user_segment_summary;
+UNION ALL SELECT 'lb_user_active_day_distribution', COUNT(*) FROM lb_user_active_day_distribution;
 "
 ```
 
@@ -237,7 +233,7 @@ LIMIT 10;
 
 批处理可以这样说：
 
-> 批处理部分我做了四个离线分析方向。数据先经过清洗和派生时间字段，再写入 Hive 明细表；之后通过 Spark SQL 或 Scala Spark 作业生成漏斗、时段、类目商品、用户分层留存等结果表，并导出到 MySQL。网站报告不是写死截图，而是根据 MySQL 结果表动态生成图表。这里我展示代码和 MySQL 结果表，以及网站上的 15 到 18 号报告。
+> 批处理部分我做了四个离线分析方向。数据先经过清洗和派生时间字段，再写入 Hive 明细表；之后通过 Spark SQL 或 Scala Spark 作业生成漏斗、时段、热门类目、活跃天数等结果表，并导出到 MySQL。网站报告不是写死截图，而是根据 MySQL 结果表动态生成图表。这里我展示代码和 MySQL 结果表，以及网站上的 15 到 18 号报告。
 
 实时处理可以这样说：
 
