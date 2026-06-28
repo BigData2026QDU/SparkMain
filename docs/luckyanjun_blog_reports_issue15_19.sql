@@ -5,14 +5,10 @@ START TRANSACTION;
 DELETE FROM blog WHERE bindex IN (15, 16, 17, 18, 19);
 
 INSERT INTO blog (bindex, btype, paragraph, content) VALUES
-(15, 1, 0, 'LuckyAnJun #15 用户行为漏斗与转化流失分析。本报告基于淘宝 UserBehavior 清洗后的明细表，由 Spark 离线任务计算并导出到 MySQL。分析口径为：pv 表示浏览，fav 和 cart 合并为意向行为，buy 表示购买行为；该漏斗用于观察用户是否曾到达某个行为阶段，不假设严格的 pv -> fav/cart -> buy 顺序。'),
+(15, 1, 0, 'LuckyAnJun #15 用户行为整体漏斗概况。本报告基于淘宝 UserBehavior 清洗后的明细表，由 Spark 离线任务计算并导出到 MySQL。分析口径为：pv 表示浏览，fav 和 cart 合并为意向行为，buy 表示购买行为；该漏斗用于观察用户是否曾到达某个行为阶段，不假设严格的 pv -> fav/cart -> buy 顺序。'),
 (15, 1, 1, '一、整体漏斗概况。当前结果中，发生过浏览的用户为 55611 人，发生过收藏或加购意向的用户为 48831 人，发生过购买的用户为 38019 人。浏览用户中同时发生意向行为的用户为 48605 人，转化率为 87.40%；浏览用户中最终购买的用户为 37836 人，转化率为 68.04%。这说明在当前采样数据中，大部分浏览用户并非只停留在浏览阶段，而是继续产生了明确兴趣或购买行为。'),
-(15, 0, 2, 'lb_funnel_daily(event_date,pv_users,intent_users,buy_users)#bar'),
-(15, 1, 3, '二、每日转化趋势。按天观察，购买用户数在 2017-12-03 达到 9900 人，在 2017-12-02 达到 9862 人，周末两天购买用户规模最高。但从浏览到购买的用户转化率看，2017-11-27 为 19.87%，高于 12 月 2 日的 17.21% 和 12 月 3 日的 17.29%。这说明流量规模高并不一定代表转化效率最高，需要同时关注用户量和转化率。'),
-(15, 0, 4, 'lb_funnel_daily(event_date,pv_to_intent_rate,intent_to_buy_rate,pv_to_buy_rate)#line'),
-(15, 1, 5, '三、流失结构。整体来看，浏览后未产生收藏或加购意向的用户为 7006 人，浏览阶段流失率为 12.60%；有意向但未购买的用户为 14558 人，意向阶段流失率为 29.81%。日维度上，意向到购买的流失率长期高于浏览到意向的流失率，说明关键损耗集中在用户已经表现兴趣之后，后续可从商品承接、优惠触达和复购提醒等角度优化。'),
-(15, 0, 6, 'lb_funnel_daily(event_date,pv_loss_rate,intent_loss_rate)#line'),
-(15, 1, 7, '综合结论：#15 报告适合用于展示淘宝用户行为从浏览、意向到购买的整体路径。当前数据的浏览到意向转化较高，但意向到购买仍有接近三成流失，因此报告中最值得保留的表是 lb_funnel_overall 和 lb_funnel_daily，分别用于总览和每日趋势。'),
+(15, 0, 2, 'lb_funnel_overall(pv_users,intent_users,buy_users,pv_to_intent_users,intent_to_buy_users,pv_to_buy_users)#bar'),
+(15, 1, 3, '综合结论：#15 报告只保留整体漏斗概况，用于展示浏览、意向和购买三个阶段的总体用户规模与总体转化关系。该报表不展开每日趋势和流失拆分，答辩时重点说明整体漏斗口径和核心转化率。'),
 
 (16, 1, 0, 'LuckyAnJun #16 时段流量与购买高峰分析。本报告使用 lb_time_hour_distribution、lb_time_high_conversion_slots、lb_time_low_conversion_slots 和 lb_time_weekday_hour_heatmap 等结果表，分析 24 小时流量分布、购买高峰和低转化时段。'),
 (16, 1, 1, '一、小时流量高峰。按 24 小时聚合后，21 点 PV 最高，为 431141；22 点为 422791；20 点为 376042。20 点到 22 点形成明显晚间流量高峰，并且对应购买行为也较活跃，说明用户在晚间集中浏览和决策，适合作为活动曝光、推荐排序和运营推送的重点时段。'),

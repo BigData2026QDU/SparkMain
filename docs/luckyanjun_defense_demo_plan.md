@@ -14,7 +14,7 @@
 
 ## 2. 批处理展示材料
 
-### 2.1 #15 用户行为漏斗与转化流失
+### 2.1 #15 用户行为整体漏斗概况
 
 代码入口：
 
@@ -24,7 +24,6 @@
 结果表：
 
 - `lb_funnel_overall`
-- `lb_funnel_daily`
 
 网站报告：
 
@@ -34,7 +33,7 @@
 
 - `pv` 表示浏览，`fav` 和 `cart` 合并为意向行为，`buy` 表示购买。
 - 整体浏览用户 55611，意向用户 48831，购买用户 38019。
-- 每日趋势可说明流量规模和转化率不完全一致。
+- 报表只保留整体漏斗概况，不展示每日趋势和流失拆分。
 
 ### 2.2 #16 时段流量与购买高峰
 
@@ -117,7 +116,7 @@
 
 ```bash
 mysql -h 47.104.27.184 -P 3306 -u test -p test_db -e "
-SELECT 'lb_funnel_daily' AS table_name, COUNT(*) AS rows_cnt FROM lb_funnel_daily
+SELECT 'lb_funnel_overall' AS table_name, COUNT(*) AS rows_cnt FROM lb_funnel_overall
 UNION ALL SELECT 'lb_time_hour_distribution', COUNT(*) FROM lb_time_hour_distribution
 UNION ALL SELECT 'lb_category_topn', COUNT(*) FROM lb_category_topn
 UNION ALL SELECT 'lb_user_segment_summary', COUNT(*) FROM lb_user_segment_summary;
