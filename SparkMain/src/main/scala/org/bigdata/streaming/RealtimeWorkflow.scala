@@ -4,23 +4,19 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
-import org.bigdata.utils.MySQLExporter
+import org.bigdata.utils.{MySQLExportConfig, MySQLExportConfig => ExportConfig}
 
 final case class RealtimeConfig(
     kafkaTopic: String,
     kafkaBootstrapServers: String,
     checkpointPath: String,
     outputPath: String,
-    jdbcUrl: String,
-    mysqlUser: String,
-    mysqlPassword: String,
-    mysqlTable: String,
-    mysqlEnabled: Boolean)
+    mysqlExport: MySQLExportConfig) {
+  def mysqlEnabled: Boolean = mysqlExport.enabled
+  def mysqlTable: Option[String] = ExportConfig.tableName(mysqlExport)
+}
 
 object RealtimeConfig {
-  private val ProductionJdbcUrl = "jdbc:mysql://localhost:3306/bigdata_ana"
-  private val ProductionTable = "realtime_stats"
-
   def fromEnvironment(env: Map[String, String] = sys.env): RealtimeConfig = {
     def value(name: String, default: String): String =
       env.get(name).map(_.trim).filter(_.nonEmpty).getOrElse(default)
@@ -36,14 +32,13 @@ object RealtimeConfig {
       }
 
     val testMode = flag("SPARKMAIN_TEST_MODE", default = false)
-    val jdbcUrl = value("MYSQL_JDBC_URL", ProductionJdbcUrl)
-    val mysqlTable = value("MYSQL_TABLE", ProductionTable)
-    val mysqlEnabled = flag("MYSQL_ENABLED", default = true)
+    val mysqlExport = MySQLExportConfig.fromEnvironment(
+      Seq("MYSQL_TABLE"),
+      env)
 
-    if (testMode && mysqlEnabled &&
-        (jdbcUrl == ProductionJdbcUrl || mysqlTable == ProductionTable)) {
+    if (testMode && mysqlExport.enabled) {
       throw new IllegalArgumentException(
-        "test mode cannot write to production MySQL URL or table")
+        "test mode cannot enable MySQL export")
     }
 
     RealtimeConfig(
@@ -54,11 +49,7 @@ object RealtimeConfig {
         "STREAMING_CHECKPOINT_PATH",
         "/tmp/spark/checkpoints/realtime_workflow"),
       outputPath = value("STREAMING_OUTPUT_PATH", "output/realtime_stats"),
-      jdbcUrl = jdbcUrl,
-      mysqlUser = value("MYSQL_USER", "root"),
-      mysqlPassword = env.getOrElse("MYSQL_PASSWORD", ""),
-      mysqlTable = mysqlTable,
-      mysqlEnabled = mysqlEnabled)
+      mysqlExport = mysqlExport)
   }
 }
 
@@ -100,15 +91,9 @@ object RealtimeWorkflow {
         batchDF.write.mode(SaveMode.Append).parquet(config.outputPath)
 
         if (config.mysqlEnabled) {
-          val props =
-            MySQLExporter.createProperties(
-              config.mysqlUser,
-              config.mysqlPassword)
-          MySQLExporter.exportToMySQL(
+          ExportConfig.exportIfEnabled(
             batchDF,
-            config.mysqlTable,
-            config.jdbcUrl,
-            props,
+            config.mysqlExport,
             SaveMode.Append)
         }
       }
@@ -120,7 +105,8 @@ object RealtimeWorkflow {
     println(s"Kafka Topic: ${config.kafkaTopic}")
     println(s"输出目录: ${config.outputPath}")
     println(
-      if (config.mysqlEnabled) s"MySQL: ${config.jdbcUrl}/${config.mysqlTable}"
+      if (config.mysqlEnabled)
+        s"MySQL: enabled, table=${config.mysqlTable.getOrElse("<configured>")}"
       else "MySQL: disabled")
 
     query.awaitTermination()

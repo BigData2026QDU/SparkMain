@@ -1,249 +1,223 @@
 # SparkMain
 
-## 简介
+## 项目简介
 
-SparkMain 是一个基于 Apache Spark + Scala 的大数据处理流水线，使用 MovieLens 电影评分数据集进行分析。本项目提供自动化数据清洗、分析任务执行的完整流程。
+SparkMain 是基于 Java 17、Scala 2.12 和 Apache Spark 3.5.0 的 MovieLens 大数据分析流水线。仓库负责离线分析与实时统计结果生成；可视化展示由 Web 项目承担，本仓库只在配置允许时把分析结果写入 MySQL。
 
-## 环境要求
+## 数据集选择
 
-| 组件 | 版本 | 说明 |
-|------|------|------|
-| JDK | 17 | Java 开发工具包 |
-| Scala | 2.12 | Scala 开发工具包 |
-| Apache Spark | 3.5.0 | 大数据处理框架 |
-| sbt | 1.9+ | Scala 构建工具 |
-| Python | 3.8+ | 数据清洗脚本 |
-| Kafka | 3.6+ | 消息队列（实时流处理） |
+本项目选择 GroupLens MovieLens 25M 数据集，下载脚本为 `dataset/download_movielens.py`，目标压缩包为 `ml-25m.zip`。
 
-## 快速开始
+选择理由：
 
-### 1. 克隆仓库
+- 数据规模足够大：约 2500 万条评分、约 62000 部电影、约 162000 名用户，解压后 CSV 总体积超过普通课堂样例数据，适合 Spark 批处理。
+- 字段结构稳定：`ratings.csv`、`movies.csv` 可以支撑评分质量、类型热度、时间趋势和用户行为四类不同分析。
+- 版权和来源清晰：数据由 GroupLens 发布，便于复现实验。
 
-```bash
-git clone https://github.com/BigData2026QDU/SparkMain.git
-cd SparkMain
-git submodule update --init --recursive
-```
-
-### 2. 下载数据集
-
-从 [MovieLens 25M](https://grouplens.org/datasets/movielens/25m/) 下载数据集，将 CSV 文件放入 `dataset/` 目录。
-
-或使用内置下载脚本：
+大 CSV 文件不会提交到 Git。请通过下载脚本或手动下载后放入 `dataset/`。
 
 ```bash
 python dataset/download_movielens.py
 ```
 
-### 3. 构建项目
+## 环境要求
+
+| 组件 | 版本 | 用途 |
+|------|------|------|
+| JDK | 17 | Spark/Scala 运行环境 |
+| Scala | 2.12 | Spark 3.5.0 二进制兼容版本 |
+| Apache Spark | 3.5.0 | 离线分析与实时统计 |
+| sbt | 1.9+ | 构建 Scala 项目 |
+| Python | 3.8+ | 数据下载、截断和清洗脚本 |
+| Kafka | 3.6+ | 实时评分流输入 |
+| MySQL | 8.0+ | 可选分析结果输出 |
+
+## 构建
 
 ```bash
 cd SparkMain
 sbt package
 ```
 
-### 4. 运行流水线
+构建产物路径：
 
-**生产模式：**
+```text
+SparkMain/target/scala-2.12/sparkmain_2.12-1.0.0.jar
+```
+
+CI 或发布构建可以覆盖版本号：
 
 ```bash
-chmod +x main_pipeline_new.sh
-./main_pipeline_new.sh
-```
-
-**测试模式：**
-
-```bash
-chmod +x main_pipeline_test.sh
-./main_pipeline_test.sh
-```
-
-## 流水线说明
-
-### 执行流程
-
-```
-原始数据 (dataset/)
-    ↓
-Python 清洗脚本 (cleanPy/)
-    ↓
-清洗后数据 (cleanedDataset/)
-    ↓
-Spark 分析任务 (Scala)
-    ↓
-分析结果 (output/)
-```
-
-### 目录结构
-
-```
-SparkMain/
-├── SparkMain/              # 源代码目录
-│   ├── src/main/scala/org/bigdata/
-│   │   ├── Main.scala              # 主入口
-│   │   ├── streaming/
-│   │   │   ├── RatingStreamProcessor.scala  # Spark Streaming 处理器
-│   │   │   └── RatingProducer.scala         # Kafka 数据生成器
-│   │   └── analysis/
-│   │       ├── AnalyzeRatings.scala         # 评分分析
-│   │       └── AnalyzeGenres.scala          # 类型分析
-│   ├── build.sbt           # Scala 构建配置
-│   └── test/
-├── dataset/                # 原始数据目录
-├── dataset_test/           # 测试数据目录（轻量级）
-├── cleanPy/                # 生产清洗脚本
-├── cleanPy_test/           # 测试清洗脚本
-├── output/                 # 分析结果输出
-├── config/                 # 配置文件
-├── start_streaming.sh      # 启动 Kafka + Spark Streaming
-├── main_pipeline_new.sh    # 新流水线脚本（Spark + Scala）
-├── main_pipeline_test.sh   # 测试流水线脚本
-├── Architecture.md         # 架构文档
-├── README.md               # 项目说明
-├── Workflow.md             # 工作流设计文档
-└── .gitignore              # Git 忽略配置
-```
-
-## 如何编写新任务
-
-### 任务规范
-
-在 `SparkMain/src/main/scala/org/bigdata/analysis/` 目录下创建 Scala 文件：
-
-1. **文件命名：** `Analyze任务名称.scala`
-   - 示例：`AnalyzeMovies.scala`
-
-2. **Scala 代码模板：**
-```scala
-package org.bigdata.analysis
-
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions._
-
-object AnalyzeMovies {
-  def main(args: Array[String]): Unit = {
-    val spark = SparkSession.builder()
-      .appName("AnalyzeMovies")
-      .getOrCreate()
-
-    // 读取数据
-    val data = spark.read.parquet("output/ratings_streaming")
-
-    // 分析逻辑
-    val result = data.groupBy("movieId")
-      .agg(avg("rating").as("avg_rating"))
-
-    // 输出结果
-    result.show()
-
-    // 保存结果
-    result.write.mode("overwrite").parquet("output/movie_stats")
-
-    spark.stop()
-  }
-}
-```
-
-3. **在 Main.scala 中注册任务：**
-```scala
-case "movies" => AnalyzeMovies.main(args.drop(1))
-```
-
-4. **运行任务：**
-```bash
-spark-submit --class org.bigdata.Main movies SparkMain/target/scala-2.12/sparkmain_2.12-1.0.jar
-```
-
-### 测试模式
-
-本项目支持测试模式，使用轻量级测试数据（10-100KB）快速验证流水线。
-
-**测试目录结构：**
-
-| 生产目录 | 测试目录 | 说明 |
-|---------|---------|------|
-| `dataset/` | `dataset_test/` | 测试数据 |
-| `cleanPy/` | `cleanPy_test/` | 测试清洗脚本 |
-
-**运行测试：**
-
-```bash
-./main_pipeline_test.sh
-```
-
-## 实时流处理
-
-本项目支持基于 Kafka + Spark Structured Streaming 的增量数据处理。
-
-### 架构
-
-```
-Kafka Topic (ratings)
-    ↓
-Spark Structured Streaming
-    ↓
-Parquet 文件 (output/ratings_streaming)
-```
-
-### 启动服务
-
-```bash
-# 启动 Kafka + Spark Streaming
-chmod +x start_streaming.sh
-./start_streaming.sh
-```
-
-### 生成测试数据
-
-```bash
-# 编译项目
 cd SparkMain
-sbt package
-
-# 运行数据生成器
-spark-submit --class org.bigdata.streaming.RatingProducer target/scala-2.12/sparkmain_2.12-1.0.jar
+sbt -Dsparkmain.version=1.0.1 package
 ```
 
-## 项目结构
+## 免 sbt 运行包
 
+发布流水线会在测试通过后生成 `sparkmain-<version>.tar.gz`。下载并解压后，运行 Spark 任务不需要 sbt 或源码仓库；本机需要准备 Java 17、Scala 2.12、Spark 3.5.x、Kafka 3.6.x（实时任务需要）和一个本地 env 文件。
+
+本地配置文件不会提交到仓库。复制模板后只在本机填写真实值：
+
+```bash
+cp conf/sparkmain-env.example conf/sparkmain.env
 ```
+
+常用命令：
+
+```bash
+bash bin/sparkmain help
+bash bin/sparkmain ratings dataset output/ratings
+bash bin/sparkmain stream
+bash bin/sparkmain batch
+```
+
+`bin/sparkmain` 和 `main_pipeline_new.sh` 会自动加载第一个存在的 `.env`、`sparkmain.env` 或 `conf/sparkmain.env`，并优先使用 `SPARKMAIN_JAR`；未设置时会自动寻找运行包内的 `lib/sparkmain_2.12-*.jar`。完整批处理 `batch` 会执行 Python 数据准备脚本，因此从原始 MovieLens CSV 开始跑全流程时仍需要 Python 3.8+。
+
+本地 env 文件只支持 SparkMain 已知配置项的 `KEY=VALUE` 行；脚本不会执行 env 文件中的 shell 代码，无法识别的行会被跳过。
+
+## 离线分析任务
+
+四个离线任务位于 `SparkMain/src/main/scala/org/bigdata/analysis/`，统一通过 `org.bigdata.Main` 调度。默认输入目录为 `cleanedDataset/`，缺少文件时回退到 `dataset/`；默认输出为 Parquet，路径位于 `output/<task>`。
+
+| 任务 | 命令名 | 输出目录 | 分析点 |
+|------|--------|----------|--------|
+| `AnalyzeRatings` | `ratings` | `output/ratings` | 电影评分质量：评分数、均分、最高/最低分、评分标准差 |
+| `AnalyzeGenres` | `genres` | `output/genres` | 类型热度：展开电影类型后统计评分量、电影数、用户数、评分占比 |
+| `AnalyzeTime` | `time` | `output/time` | 时间趋势：按月份统计评分量、活跃用户、被评电影和平均评分 |
+| `AnalyzeUsers` | `users` | `output/users` | 用户行为分群：按评分活跃度和评分倾向汇总用户群体 |
+
+运行单个任务：
+
+```bash
+spark-submit \
+  --class org.bigdata.Main \
+  --master local[*] \
+  SparkMain/target/scala-2.12/sparkmain_2.12-1.0.0.jar \
+  ratings cleanedDataset output/ratings
+```
+
+也可以使用参数形式：
+
+```bash
+spark-submit --class org.bigdata.Main --master local[*] \
+  SparkMain/target/scala-2.12/sparkmain_2.12-1.0.0.jar \
+  genres --input cleanedDataset --output output/genres --format parquet
+```
+
+运行完整批处理流水线：
+
+```bash
+python dataset/download_movielens.py
+bash main_pipeline_new.sh
+```
+
+## 实时统计任务
+
+实时任务使用 Kafka + Spark Structured Streaming 读取评分 JSON，按 1 分钟窗口和 `movieId` 统计：
+
+- `rating_count`
+- `avg_rating`
+- `max_rating`
+- `min_rating`
+
+启动方式：
+
+```bash
+bash main_pipeline_new.sh stream
+```
+
+默认会把实时结果写入 `output/realtime_stats`。实时 MySQL 输出默认关闭，只有显式配置 `MYSQL_ENABLED=true` 后才会写入。
+
+## MySQL 输出配置
+
+所有 MySQL 写入都使用环境变量配置，代码和脚本不包含账号、密码或默认生产库地址。离线批处理和实时统计使用不同的启用开关，默认都不会写 MySQL。
+
+推荐将本地配置写入 `.env` 或 `conf/sparkmain.env`，并从 `release/conf/sparkmain-env.example` 复制占位模板。真实 env 文件已被 `.gitignore` 忽略，不能提交或上传。
+
+共享连接变量：
+
+```bash
+export MYSQL_JDBC_URL="jdbc:mysql://<host>:<port>/<database>?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
+export MYSQL_USER="<username>"
+export MYSQL_PASSWORD="<password>"
+```
+
+离线批处理必须显式启用 `OFFLINE_MYSQL_ENABLED=true`，并且四个报告分别使用任务专用表名；离线任务不会读取通用 `MYSQL_TABLE`：
+
+```bash
+export OFFLINE_MYSQL_ENABLED="true"
+export MYSQL_TABLE_RATINGS="<ratings_table>"
+export MYSQL_TABLE_GENRES="<genres_table>"
+export MYSQL_TABLE_TIME="<time_table>"
+export MYSQL_TABLE_USERS="<users_table>"
+```
+
+实时统计继续使用 `MYSQL_ENABLED=true` 和通用 `MYSQL_TABLE`：
+
+```bash
+export MYSQL_ENABLED="true"
+export MYSQL_TABLE="<realtime_table>"
+```
+
+安全约束：
+
+- 不提交 `.env`、密码、真实 JDBC URL 或截图中的凭据。
+- 日志只显示 MySQL 是否启用和表名，不打印完整 JDBC URL。
+- 测试不连接真实数据库。
+
+## 测试和验证命令
+
+静态脚本检查：
+
+```bash
+bash -n main_pipeline_new.sh
+bash -n main_pipeline_test.sh
+bash -n test/verify_results.sh
+bash -n release/bin/sparkmain
+```
+
+Python 脚本语法检查：
+
+```bash
+python -m py_compile truncate_file.py dataset/download_movielens.py cleanPy/clean_ratings.py cleanPy_test/clean_ratings.py
+```
+
+Scala 单元测试：
+
+```bash
+cd SparkMain
+sbt -batch clean test
+```
+
+## 目录结构
+
+```text
 SparkMain/
-├── SparkMain/              # 源代码目录
-│   ├── src/main/scala/org/bigdata/
-│   │   ├── Main.scala
-│   │   ├── streaming/
-│   │   │   ├── RatingStreamProcessor.scala
-│   │   │   └── RatingProducer.scala
-│   │   └── analysis/
-│   │       ├── AnalyzeRatings.scala
-│   │       └── AnalyzeGenres.scala
+├── SparkMain/
 │   ├── build.sbt
-│   └── test/
-├── config/
-│   └── streaming.properties
+│   └── src/
+│       ├── main/scala/org/bigdata/
+│       │   ├── Main.scala
+│       │   ├── analysis/
+│       │   ├── streaming/
+│       │   └── utils/
+│       └── test/scala/org/bigdata/
 ├── dataset/
 ├── dataset_test/
 ├── cleanPy/
 ├── cleanPy_test/
 ├── output/
-├── start_streaming.sh
+├── release/
+│   ├── bin/sparkmain
+│   ├── conf/sparkmain-env.example
+│   └── README.md
 ├── main_pipeline_new.sh
 ├── main_pipeline_test.sh
 ├── Architecture.md
-├── README.md
-├── Workflow.md
-└── .gitignore
+├── File_Index.md
+└── README.md
 ```
-
-## 贡献指南
-
-1. Fork 本仓库
-2. 新建 `feature/xxx` 或 `hotfix/xxx` 分支
-3. 按照「如何编写新任务」规范添加 Scala 代码
-4. 运行 `sbt compile` 确保编译通过
-5. 本地测试流水线执行通过
-6. 提交代码并创建 Pull Request
 
 ## 许可证
 
-本项目遵循项目规范仓库中的许可证要求。
+本项目遵循课程项目仓库规范中的许可证要求。

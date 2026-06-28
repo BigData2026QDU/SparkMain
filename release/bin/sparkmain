@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_HOME="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+trim_env_space() {
+    local value=$1
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf "%s" "$value"
+}
+
+strip_env_quotes() {
+    local value=$1
+    if [ "${#value}" -ge 2 ]; then
+        case "$value" in
+            \"*\") value="${value:1:${#value}-2}" ;;
+            \'*\') value="${value:1:${#value}-2}" ;;
+        esac
+    fi
+    printf "%s" "$value"
+}
+
+is_allowed_env_key() {
+    case "$1" in
+        PYTHON_CMD|SPARK_MASTER|SPARK_LOCAL_IP|SPARKMAIN_JAR|JAR_PATH|SPARKMAIN_EXTRA_JARS|SPARKMAIN_TEST_MODE)
+            return 0
+            ;;
+        DATASET_DIR|TRUNCATED_DIR|CLEANED_DIR|CLEANPY_DIR|OUTPUT_DIR)
+            return 0
+            ;;
+        KAFKA_TOPIC|KAFKA_BOOTSTRAP_SERVERS|STREAMING_CHECKPOINT_PATH|STREAMING_OUTPUT_PATH)
+            return 0
+            ;;
+        MYSQL_ENABLED|OFFLINE_MYSQL_ENABLED|MYSQL_JDBC_URL|MYSQL_USER|MYSQL_PASSWORD)
+            return 0
+            ;;
+        MYSQL_TABLE|MYSQL_TABLE_RATINGS|MYSQL_TABLE_GENRES|MYSQL_TABLE_TIME|MYSQL_TABLE_USERS)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+warn_ignored_env_line() {
+    local env_file=$1
+    local line_number=$2
+    echo "[警告] 忽略不支持的本地环境配置行: $env_file:$line_number" >&2
+}
+
+load_env_file() {
+    local env_file=$1
+    local line
+    local line_number=0
+    local key
+    local value
+
+    if [ ! -f "$env_file" ]; then
+        return 1
+    fi
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        line_number=$((line_number + 1))
+        line="${line%$'\r'}"
+        line="$(trim_env_space "$line")"
+
+        case "$line" in
+            ""|\#*) continue ;;
+        esac
+
+        if [[ "$line" != *=* ]]; then
+            warn_ignored_env_line "$env_file" "$line_number"
+            continue
+        fi
+
+        key="$(trim_env_space "${line%%=*}")"
+        value="$(trim_env_space "${line#*=}")"
+
+        if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || ! is_allowed_env_key "$key"; then
+            warn_ignored_env_line "$env_file" "$line_number"
+            continue
+        fi
+
+        value="$(strip_env_quotes "$value")"
+        printf -v "$key" "%s" "$value"
+        export "$key"
+    done < "$env_file"
+
+    echo "[信息] 已加载本地环境配置: $env_file"
+    return 0
+}
+
+load_local_env() {
+    local candidate
+    for candidate in \
+        "$APP_HOME/.env" \
+        "$APP_HOME/sparkmain.env" \
+        "$APP_HOME/conf/sparkmain.env"; do
+        if load_env_file "$candidate"; then
+            return 0
+        fi
+    done
+    return 0
+}
+
+resolve_path() {
+    local path_value=$1
+    case "$path_value" in
+        /*|[A-Za-z]:*) printf "%s\n" "$path_value" ;;
+        *) printf "%s\n" "$APP_HOME/$path_value" ;;
+    esac
+}
+
+discover_default_jar() {
+    local jar
+    for jar in "$APP_HOME"/lib/sparkmain_2.12-*.jar; do
+        if [ -f "$jar" ]; then
+            printf "%s\n" "$jar"
+            return 0
+        fi
+    done
+    printf "%s\n" "$APP_HOME/SparkMain/target/scala-2.12/sparkmain_2.12-1.0.0.jar"
+}
+
+join_distribution_jars() {
+    local result=""
+    local separator=""
+    local jar
+    local app_jar_name
+
+    app_jar_name="$(basename "$JAR_PATH")"
+    if [ ! -d "$APP_HOME/lib" ]; then
+        return 0
+    fi
+
+    for jar in "$APP_HOME"/lib/*.jar; do
+        if [ ! -f "$jar" ]; then
+            continue
+        fi
+        if [ "$(basename "$jar")" = "$app_jar_name" ]; then
+            continue
+        fi
+        result="${result}${separator}${jar}"
+        separator=","
+    done
+
+    printf "%s" "$result"
+}
+
+check_command() {
+    local cmd=$1
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "[错误] 命令 '$cmd' 未找到，请先安装并配置环境变量"
+        exit 1
+    fi
+}
+
+spark_submit_main() {
+    local extra_jars
+    local submit_args
+
+    extra_jars="${SPARKMAIN_EXTRA_JARS:-$(join_distribution_jars)}"
+    submit_args=(--class org.bigdata.Main --master "$SPARK_MASTER")
+    if [ -n "$extra_jars" ]; then
+        submit_args+=(--jars "$extra_jars")
+    fi
+
+    spark-submit "${submit_args[@]}" "$JAR_PATH" "$@"
+}
+
+load_local_env
+
+SPARK_MASTER="${SPARK_MASTER:-local[*]}"
+CONFIGURED_JAR_PATH="${SPARKMAIN_JAR:-${JAR_PATH:-}}"
+if [ -n "$CONFIGURED_JAR_PATH" ]; then
+    JAR_PATH="$(resolve_path "$CONFIGURED_JAR_PATH")"
+else
+    JAR_PATH="$(discover_default_jar)"
+fi
+
+check_command spark-submit
+
+if [ ! -f "$JAR_PATH" ]; then
+    echo "[错误] JAR 文件不存在: $JAR_PATH"
+    echo "[提示] 请确认压缩包完整，或在本地环境文件中设置 SPARKMAIN_JAR"
+    exit 1
+fi
+
+if [ $# -eq 0 ]; then
+    set -- help
+fi
+
+case "$1" in
+    batch)
+        shift
+        export SPARKMAIN_HOME="$APP_HOME"
+        export SPARKMAIN_JAR="$JAR_PATH"
+        exec bash "$APP_HOME/main_pipeline_new.sh" "$@"
+        ;;
+    stream)
+        shift
+        spark_submit_main realtime "$@"
+        ;;
+    *)
+        spark_submit_main "$@"
+        ;;
+esac

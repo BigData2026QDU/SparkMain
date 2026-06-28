@@ -11,6 +11,13 @@ build/
 
 # 日志文件
 *.log
+.codex/
+
+# 本地环境配置（示例模板不受影响）
+.env
+*.env
+conf/*.env
+release/conf/*.env
 
 # 操作系统文件
 .DS_Store

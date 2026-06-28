@@ -6,11 +6,23 @@ on:
       - main
       - yiyangchen609-web
       - "codex/**"
+    tags:
+      - "v*"
   pull_request:
     branches:
       - main
       - yiyangchen609-web
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the existing v* tag to GitHub Release and GitHub Packages"
+        required: false
+        type: boolean
+        default: false
+      publish_version:
+        description: "Manual publish version without leading v, for example 1.0.1"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +34,7 @@ concurrency:
 env:
   SPARKMAIN_TEST_MODE: "true"
   MYSQL_ENABLED: "false"
+  OFFLINE_MYSQL_ENABLED: "false"
   MYSQL_JDBC_URL: "jdbc:h2:mem:sparkmain_test;DB_CLOSE_DELAY=-1"
   MYSQL_TABLE: "realtime_stats_test"
   SPARK_LOCAL_IP: "127.0.0.1"
@@ -48,6 +61,7 @@ jobs:
           bash -n main_pipeline_new.sh
           bash -n main_pipeline_test.sh
           bash -n test/verify_results.sh
+          bash -n release/bin/sparkmain
           python -m py_compile \
             truncate_file.py \
             dataset/download_movielens.py \
@@ -82,3 +96,259 @@ jobs:
       - name: Compile and test
         working-directory: SparkMain
         run: sbt -batch clean test
+
+  package-distribution:
+    name: Package runnable distribution
+    runs-on: ubuntu-latest
+    needs: [static-checks, spark-tests]
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish_tag: ${{ steps.version.outputs.publish_tag }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version=""
+          publish_tag=""
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            publish_tag="$GITHUB_REF_NAME"
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.0.0-ci.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          fi
+
+          if [[ "$version" == v* || ! "$version" =~ ^[0-9][0-9A-Za-z.-]*$ ]]; then
+            echo "Invalid SparkMain version: $version"
+            exit 1
+          fi
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.publish }}" == "true" ]]; then
+            if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+              echo "Manual publish is only allowed when workflow_dispatch runs on refs/tags/v*; building a CI artifact only."
+            elif [[ "${{ inputs.publish_version }}" != "$version" ]]; then
+              echo "publish_version must match the current tag version: $version"
+              exit 1
+            fi
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish_tag=$publish_tag" >> "$GITHUB_OUTPUT"
+          echo "SPARKMAIN_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: sbt
+          cache-dependency-path: SparkMain/build.sbt
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Build staged distribution
+        working-directory: SparkMain
+        run: sbt -batch -Dsparkmain.version="$SPARKMAIN_VERSION" clean package makePom stageDistribution
+
+      - name: Create compressed package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dist_parent="SparkMain/target/sparkmain-dist"
+          dist_name="sparkmain-${SPARKMAIN_VERSION}"
+          dist_dir="${dist_parent}/${dist_name}"
+          archive="SparkMain/target/${dist_name}.tar.gz"
+          listing="${archive}.listing"
+
+          test -d "$dist_dir"
+          test -f "$dist_dir/lib/sparkmain_2.12-${SPARKMAIN_VERSION}.jar"
+          test -f "$dist_dir/bin/sparkmain"
+          test -f "$dist_dir/conf/sparkmain-env.example"
+          test -f "$dist_dir/README.md"
+
+          chmod +x "$dist_dir/bin/sparkmain"
+          if [ -f "$dist_dir/main_pipeline_new.sh" ]; then
+            chmod +x "$dist_dir/main_pipeline_new.sh"
+          fi
+          if [ -f "$dist_dir/test/verify_results.sh" ]; then
+            chmod +x "$dist_dir/test/verify_results.sh"
+          fi
+
+          tar -C "$dist_parent" -czf "$archive" "$dist_name"
+          (
+            cd "$(dirname "$archive")"
+            sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256"
+          )
+          tar -tzf "$archive" > "$listing"
+
+          if grep -E '(^|/)(\.git|\.github|\.codex|target|output|temp_download)(/|$)' "$listing"; then
+            echo "Archive contains a forbidden directory"
+            exit 1
+          fi
+          if grep -E '(^|/)\.env($|/)|(^|/)[^/]+\.env($|/)' "$listing"; then
+            echo "Archive contains a real env file"
+            exit 1
+          fi
+          if grep -E '(^|/)dataset/.*\.csv$' "$listing"; then
+            echo "Archive contains full dataset CSV files"
+            exit 1
+          fi
+          if grep -R -n -E 'MYSQL_PASSWORD="?[^<"[:space:]]|jdbc:mysql://"?[^<"[:space:]]' \
+            --include='*.md' --include='*.sh' --include='*.example' --include='*.py' \
+            "$dist_dir"; then
+            echo "Archive contains non-placeholder MySQL credentials or JDBC values"
+            exit 1
+          fi
+
+          mkdir -p SparkMain/target/maven-publish
+          cp "SparkMain/target/scala-2.12/sparkmain_2.12-${SPARKMAIN_VERSION}.jar" SparkMain/target/maven-publish/
+          cp "SparkMain/target/scala-2.12/sparkmain_2.12-${SPARKMAIN_VERSION}.pom" SparkMain/target/maven-publish/
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparkmain-distribution-${{ steps.version.outputs.version }}
+          path: |
+            SparkMain/target/sparkmain-${{ steps.version.outputs.version }}.tar.gz
+            SparkMain/target/sparkmain-${{ steps.version.outputs.version }}.tar.gz.sha256
+            SparkMain/target/sparkmain-${{ steps.version.outputs.version }}.tar.gz.listing
+          if-no-files-found: error
+
+      - name: Upload Maven artifact payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparkmain-maven-${{ steps.version.outputs.version }}
+          path: SparkMain/target/maven-publish/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: package-distribution
+    timeout-minutes: 10
+    if: >-
+      ${{
+        startsWith(github.ref, 'refs/tags/v') &&
+        (
+          github.event_name == 'push' ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            inputs.publish == true &&
+            inputs.publish_version == needs.package-distribution.outputs.version
+          )
+        )
+      }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download distribution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sparkmain-distribution-${{ needs.package-distribution.outputs.version }}
+          path: dist
+
+      - name: Publish release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.package-distribution.outputs.version }}
+          PUBLISH_TAG: ${{ needs.package-distribution.outputs.publish_tag }}
+        run: |
+          set -euo pipefail
+          publish_tag="${PUBLISH_TAG:-v${VERSION}}"
+          archive="sparkmain-${VERSION}.tar.gz"
+
+          cd dist
+          sha256sum -c "${archive}.sha256"
+
+          if gh release view "$publish_tag" >/dev/null 2>&1; then
+            echo "Release $publish_tag already exists; refusing to overwrite assets"
+            exit 1
+          fi
+
+          gh release create "$publish_tag" \
+            "$archive" \
+            "${archive}.sha256" \
+            "${archive}.listing" \
+            --verify-tag \
+            --title "$publish_tag" \
+            --notes "SparkMain runnable distribution for $publish_tag."
+
+  publish-packages:
+    name: Publish GitHub Packages
+    runs-on: ubuntu-latest
+    needs: package-distribution
+    timeout-minutes: 10
+    if: >-
+      ${{
+        startsWith(github.ref, 'refs/tags/v') &&
+        (
+          github.event_name == 'push' ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            inputs.publish == true &&
+            inputs.publish_version == needs.package-distribution.outputs.version
+          )
+        )
+      }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download Maven artifact payload
+        uses: actions/download-artifact@v4
+        with:
+          name: sparkmain-maven-${{ needs.package-distribution.outputs.version }}
+          path: maven
+
+      - name: Publish Maven package
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.package-distribution.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          jar_file="maven/sparkmain_2.12-${VERSION}.jar"
+          pom_file="maven/sparkmain_2.12-${VERSION}.pom"
+          test -f "$jar_file"
+          test -f "$pom_file"
+
+          metadata_url="https://maven.pkg.github.com/${GITHUB_REPOSITORY}/org/bigdata/sparkmain_2.12/maven-metadata.xml"
+          metadata="$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" "$metadata_url" || true)"
+          if printf "%s" "$metadata" | grep -F "<version>${VERSION}</version>" >/dev/null; then
+            echo "GitHub Packages version ${VERSION} already exists; refusing to overwrite"
+            exit 1
+          fi
+
+          settings_file="${RUNNER_TEMP}/sparkmain-maven-settings.xml"
+          cat > "$settings_file" <<SETTINGS
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${GITHUB_ACTOR}</username>
+                <password>${GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          SETTINGS
+
+          mvn --batch-mode --settings "$settings_file" deploy:deploy-file \
+            -DrepositoryId=github \
+            -Durl="https://maven.pkg.github.com/${GITHUB_REPOSITORY}" \
+            -Dfile="$jar_file" \
+            -DpomFile="$pom_file"

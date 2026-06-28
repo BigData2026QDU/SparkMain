@@ -42,7 +42,7 @@ echo "=========================================="
 echo "1. 检查项目结构"
 echo "=========================================="
 
-check_directory_exists "SparkMain/src/main/scala/org/example"
+check_directory_exists "SparkMain/src/main/scala/org/bigdata"
 check_file_exists "SparkMain/build.sbt"
 check_file_exists "main_pipeline_new.sh"
 
@@ -51,25 +51,26 @@ echo "=========================================="
 echo "2. 检查分析任务"
 echo "=========================================="
 
-check_file_exists "SparkMain/src/main/scala/org/example/analysis/AnalyzeRatings.scala"
-check_file_exists "SparkMain/src/main/scala/org/example/analysis/AnalyzeGenres.scala"
-check_file_exists "SparkMain/src/main/scala/org/example/analysis/AnalyzeTime.scala"
-check_file_exists "SparkMain/src/main/scala/org/example/analysis/AnalyzeUsers.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeRatings.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeGenres.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeTime.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeUsers.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/MovieLensAnalysisSupport.scala"
 
 echo ""
 echo "=========================================="
 echo "3. 检查流处理"
 echo "=========================================="
 
-check_file_exists "SparkMain/src/main/scala/org/example/streaming/RatingStreamProcessor.scala"
-check_file_exists "SparkMain/src/main/scala/org/example/streaming/RatingProducer.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/RealtimeWorkflow.scala"
 
 echo ""
 echo "=========================================="
 echo "4. 检查工具类"
 echo "=========================================="
 
-check_file_exists "SparkMain/src/main/scala/org/example/utils/MySQLExporter.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/utils/MySQLExporter.scala"
+check_file_exists "SparkMain/src/main/scala/org/bigdata/utils/MySQLExportConfig.scala"
 
 echo ""
 echo "=========================================="

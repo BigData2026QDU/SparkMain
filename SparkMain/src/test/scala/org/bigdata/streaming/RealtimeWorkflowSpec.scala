@@ -86,28 +86,51 @@ class RealtimeWorkflowSpec extends AnyFunSuite with BeforeAndAfterAll {
     assert(rows(20).getLong(1) == 1L)
   }
 
-  test("test mode rejects production MySQL resources") {
+  test("MySQL export is disabled unless explicitly enabled") {
+    val config = RealtimeConfig.fromEnvironment(Map.empty)
+
+    assert(!config.mysqlEnabled)
+    assert(config.mysqlTable.isEmpty)
+  }
+
+  test("MySQL export requires complete environment when enabled") {
     val error = intercept[IllegalArgumentException] {
       RealtimeConfig.fromEnvironment(Map(
-        "SPARKMAIN_TEST_MODE" -> "true",
         "MYSQL_ENABLED" -> "true",
-        "MYSQL_JDBC_URL" -> "jdbc:mysql://localhost:3306/bigdata_ana",
-        "MYSQL_TABLE" -> "realtime_stats"
+        "MYSQL_JDBC_URL" -> "jdbc:mysql://example.invalid:3306/app",
+        "MYSQL_USER" -> "user",
+        "MYSQL_PASSWORD" -> "password"
       ))
     }
 
-    assert(error.getMessage.contains("production MySQL"))
+    assert(error.getMessage.contains("MYSQL_TABLE"))
   }
 
-  test("test mode permits an isolated in-memory database") {
+  test("MySQL export can be enabled from environment without logging credentials") {
     val config = RealtimeConfig.fromEnvironment(Map(
-      "SPARKMAIN_TEST_MODE" -> "true",
       "MYSQL_ENABLED" -> "true",
-      "MYSQL_JDBC_URL" -> "jdbc:h2:mem:sparkmain_test",
+      "MYSQL_JDBC_URL" -> "jdbc:mysql://example.invalid:3306/app",
+      "MYSQL_USER" -> "user",
+      "MYSQL_PASSWORD" -> "password",
       "MYSQL_TABLE" -> "realtime_stats_test"
     ))
 
     assert(config.mysqlEnabled)
-    assert(config.mysqlTable == "realtime_stats_test")
+    assert(config.mysqlTable.contains("realtime_stats_test"))
+  }
+
+  test("test mode rejects enabled MySQL export") {
+    val error = intercept[IllegalArgumentException] {
+      RealtimeConfig.fromEnvironment(Map(
+        "SPARKMAIN_TEST_MODE" -> "true",
+        "MYSQL_ENABLED" -> "true",
+        "MYSQL_JDBC_URL" -> "jdbc:mysql://example.invalid:3306/app",
+        "MYSQL_USER" -> "user",
+        "MYSQL_PASSWORD" -> "password",
+        "MYSQL_TABLE" -> "realtime_stats_test"
+      ))
+    }
+
+    assert(error.getMessage.contains("test mode"))
   }
 }

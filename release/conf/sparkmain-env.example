@@ -1,0 +1,31 @@
+# SparkMain local runtime configuration template.
+# Copy this file to conf/sparkmain.env or .env, then fill local values.
+# Do not commit the copied env file.
+
+SPARK_MASTER=local[*]
+
+# Optional direct override. Leave empty to auto-detect lib/sparkmain_2.12-*.jar.
+# SPARKMAIN_JAR=
+
+# Kafka settings for the realtime task.
+KAFKA_TOPIC=ratings
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+STREAMING_CHECKPOINT_PATH=/tmp/spark/checkpoints/realtime_workflow
+STREAMING_OUTPUT_PATH=output/realtime_stats
+
+# MySQL writes are disabled by default. Set values locally only when you intend
+# to write to your own database.
+MYSQL_ENABLED=false
+OFFLINE_MYSQL_ENABLED=false
+MYSQL_JDBC_URL="jdbc:mysql://<host>:<port>/<database>?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
+MYSQL_USER="<username>"
+MYSQL_PASSWORD="<password>"
+
+# Realtime MySQL table, used only when MYSQL_ENABLED=true.
+MYSQL_TABLE="<realtime_table>"
+
+# Offline report tables, used only when OFFLINE_MYSQL_ENABLED=true.
+MYSQL_TABLE_RATINGS="<ratings_table>"
+MYSQL_TABLE_GENRES="<genres_table>"
+MYSQL_TABLE_TIME="<time_table>"
+MYSQL_TABLE_USERS="<users_table>"
