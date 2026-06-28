@@ -24,6 +24,7 @@
 结果表：
 
 - `lb_funnel_overall`
+- `lb_funnel_overall_stage`（图表展示用，由整体漏斗宽表重排为三行）
 
 网站报告：
 
@@ -33,7 +34,8 @@
 
 - `pv` 表示浏览，`fav` 和 `cart` 合并为意向行为，`buy` 表示购买。
 - 整体浏览用户 55611，意向用户 48831，购买用户 38019。
-- 报表只保留整体漏斗概况，不展示每日趋势和流失拆分。
+- 报表只保留整体漏斗概况，图表横轴是浏览用户、意向用户、购买用户三个阶段。
+- 转化率在文字说明中讲，图表只画阶段用户数，避免宽表多指标柱状图看不清。
 
 ### 2.2 #16 逐小时流量与购买比例
 
@@ -106,6 +108,7 @@
 ```bash
 mysql -h 47.104.27.184 -P 3306 -u test -p test_db -e "
 SELECT 'lb_funnel_overall' AS table_name, COUNT(*) AS rows_cnt FROM lb_funnel_overall
+UNION ALL SELECT 'lb_funnel_overall_stage', COUNT(*) FROM lb_funnel_overall_stage
 UNION ALL SELECT 'lb_time_hour_distribution', COUNT(*) FROM lb_time_hour_distribution
 UNION ALL SELECT 'lb_category_topn', COUNT(*) FROM lb_category_topn
 UNION ALL SELECT 'lb_user_active_day_distribution', COUNT(*) FROM lb_user_active_day_distribution;

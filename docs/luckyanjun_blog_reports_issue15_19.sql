@@ -1,14 +1,30 @@
 SET NAMES utf8mb4;
 
+DROP TABLE IF EXISTS lb_funnel_overall_stage;
+CREATE TABLE lb_funnel_overall_stage (
+  stage_order INT NOT NULL,
+  stage_name VARCHAR(32) NOT NULL,
+  user_cnt BIGINT NOT NULL,
+  conversion_rate DOUBLE DEFAULT NULL,
+  PRIMARY KEY (stage_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO lb_funnel_overall_stage (stage_order, stage_name, user_cnt, conversion_rate)
+SELECT 1, '浏览用户', pv_users, 1.0 FROM lb_funnel_overall
+UNION ALL
+SELECT 2, '意向用户', intent_users, pv_to_intent_rate FROM lb_funnel_overall
+UNION ALL
+SELECT 3, '购买用户', buy_users, pv_to_buy_rate FROM lb_funnel_overall;
+
 START TRANSACTION;
 
 DELETE FROM blog WHERE bindex IN (15, 16, 17, 18, 19);
 
 INSERT INTO blog (bindex, btype, paragraph, content) VALUES
 (15, 1, 0, 'LuckyAnJun #15 用户行为整体漏斗概况。本报告基于淘宝 UserBehavior 清洗后的明细表，由 Spark 离线任务计算并导出到 MySQL。分析口径为：pv 表示浏览，fav 和 cart 合并为意向行为，buy 表示购买行为；该漏斗用于观察用户是否曾到达某个行为阶段，不假设严格的 pv -> fav/cart -> buy 顺序。'),
-(15, 1, 1, '一、整体漏斗概况。当前结果中，发生过浏览的用户为 55611 人，发生过收藏或加购意向的用户为 48831 人，发生过购买的用户为 38019 人。浏览用户中同时发生意向行为的用户为 48605 人，转化率为 87.40%；浏览用户中最终购买的用户为 37836 人，转化率为 68.04%。这说明在当前采样数据中，大部分浏览用户并非只停留在浏览阶段，而是继续产生了明确兴趣或购买行为。'),
-(15, 0, 2, 'lb_funnel_overall(pv_users,intent_users,buy_users,pv_to_intent_users,intent_to_buy_users,pv_to_buy_users)#bar'),
-(15, 1, 3, '综合结论：#15 报告只保留整体漏斗概况，用于展示浏览、意向和购买三个阶段的总体用户规模与总体转化关系。该报表不展开每日趋势和流失拆分，答辩时重点说明整体漏斗口径和核心转化率。'),
+(15, 1, 1, '一、整体漏斗概况。当前结果中，发生过浏览的用户为 55611 人，发生过收藏或加购意向的用户为 48831 人，发生过购买的用户为 38019 人。浏览用户中同时发生意向行为的用户为 48605 人，转化率为 87.40%；浏览用户中最终购买的用户为 37836 人，转化率为 68.04%。图表横轴按浏览用户、意向用户、购买用户三个阶段展示，便于直观看到用户规模逐级收窄。'),
+(15, 0, 2, 'lb_funnel_overall_stage(stage_name,user_cnt)#bar'),
+(15, 1, 3, '综合结论：#15 报告只保留整体漏斗概况，用于展示浏览、意向和购买三个阶段的总体用户规模与总体转化关系。图表只画三个阶段的用户数，转化率在文字中说明，避免把多个宽表字段并列画成难以理解的柱状图。'),
 
 (16, 1, 0, 'LuckyAnJun #16 逐小时流量与购买比例分析。本报告只保留 lb_time_hour_distribution 这一张逐小时结果表，横轴按 0 点到 23 点顺序展示。图表只展示 PV 和 hourly_buy_rate，避免多个指标混在一起导致报表阅读混乱。'),
 (16, 1, 1, '一、逐小时概况。按 24 小时聚合后，21 点 PV 最高，为 431141；22 点为 422791；20 点为 376042，晚间 20 点到 22 点形成明显流量高峰。每小时购买比例使用 hourly_buy_rate 表示，即购买用户数与浏览用户数的比例。'),

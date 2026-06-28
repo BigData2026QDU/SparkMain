@@ -54,7 +54,8 @@
 - 网站报告：`报告 #15`
 - SQL：`jobSQL/06_luckyanjun_funnel_conversion.sql`
 - Scala：`UserBehaviorFunnelJob.scala`
-- 报表保留结果表：`lb_funnel_overall`
+- 原始结果表：`lb_funnel_overall`
+- 图表展示表：`lb_funnel_overall_stage`
 
 ### 4.1 答辩说词
 
@@ -66,7 +67,7 @@
 
 ### 4.2 可以展开讲的点
 
-> 这个报表现在只保留整体漏斗概况，不展开每日趋势。答辩时重点看 `lb_funnel_overall` 这一张结果表，说明三个阶段的总体人数和总体转化关系即可。  
+> 这个报表现在只保留整体漏斗概况，不展开每日趋势。图表为了更直观，把 `lb_funnel_overall` 这张宽表重排成 `lb_funnel_overall_stage`，横轴就是浏览用户、意向用户、购买用户三个阶段，纵轴是用户数。
 > 如果老师问为什么不展开每日趋势，可以说明：第一个离线分析用于做入口总览，后面的时段分析、类目分析和用户分层会分别展开更细粒度的问题，因此这里保留整体漏斗更清晰。
 
 ### 4.3 老师可能追问
