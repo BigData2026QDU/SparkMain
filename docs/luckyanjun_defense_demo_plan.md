@@ -56,7 +56,7 @@
 - 图表只展示 `pv` 和 `hourly_buy_rate`，避免多个指标混在一起。
 - 21 点 PV 最高，22 点第二，20 点第三，晚间 20-22 点是流量高峰。
 
-### 2.3 #17 类目热度与商品转化效率
+### 2.3 #17 热门类目 Top20
 
 代码入口：
 
@@ -66,10 +66,6 @@
 结果表：
 
 - `lb_category_topn`
-- `lb_item_topn`
-- `lb_category_conversion_rank`
-- `lb_category_low_conversion`
-- `lb_category_efficiency`
 
 网站报告：
 
@@ -78,8 +74,9 @@
 讲解重点：
 
 - UserBehavior 数据没有金额、价格和商品名，所以只分析行为热度和行为转化，不做 GMV。
-- 类目热度和转化效率不是同一件事。
-- 高 PV 商品可能低转化，低 PV 类目也可能高转化。
+- 报表只保留热门类目 Top20，横轴使用脱敏后的 `category_id`。
+- 图表只展示 `pv_cnt` 和 `category_conversion_rate`，避免报表过乱。
+- 类目 4756105 的 PV 最高，为 278528，转化率为 5.78%；类目 4145813 的 PV 第二，为 184965，转化率为 7.77%。
 
 ### 2.4 #18 用户分层、留存与短期复购
 
