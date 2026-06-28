@@ -4,7 +4,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
-import org.bigdata.utils.{MySQLExportConfig, MySQLExportConfig => ExportConfig}
+import org.bigdata.utils.MySQLExportConfig
 
 final case class RealtimeConfig(
     kafkaTopic: String,
@@ -13,7 +13,7 @@ final case class RealtimeConfig(
     outputPath: String,
     mysqlExport: MySQLExportConfig) {
   def mysqlEnabled: Boolean = mysqlExport.enabled
-  def mysqlTable: Option[String] = ExportConfig.tableName(mysqlExport)
+  def mysqlTable: Option[String] = MySQLExportConfig.tableName(mysqlExport)
 }
 
 object RealtimeConfig {
@@ -91,11 +91,12 @@ object RealtimeWorkflow {
         batchDF.write.mode(SaveMode.Append).parquet(config.outputPath)
 
         if (config.mysqlEnabled) {
-          ExportConfig.exportIfEnabled(
+          MySQLExportConfig.exportIfEnabled(
             batchDF,
             config.mysqlExport,
             SaveMode.Append)
         }
+        ()
       }
       .option("checkpointLocation", config.checkpointPath)
       .trigger(Trigger.ProcessingTime("10 seconds"))
