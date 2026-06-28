@@ -135,7 +135,10 @@ http://47.104.27.184:8317/hivehbase
 
 ### 4.1 推荐现场演示方式
 
-现场分两个终端。
+现场分两个终端。为了让页面变化明显，建议不要直接用很小的
+`dataset_test/UserBehavior.csv`，而是现场生成一份按时间递增的 demo CSV。
+这样 Spark 每个 micro-batch 都会处理新的 5 分钟窗口，页面上的窗口时间、
+PV、转化率、热门类目和热门商品都会持续变化。
 
 终端 A：启动实时任务。
 
@@ -150,9 +153,10 @@ export MYSQL_CREATE_DATABASE=false
 read -s MYSQL_PASSWORD
 export MYSQL_PASSWORD
 
-export KAFKA_USER_BEHAVIOR_TOPIC=taobao_behavior
+export KAFKA_USER_BEHAVIOR_TOPIC=taobao_behavior_demo
 export KAFKA_STARTING_OFFSETS=latest
 export USER_BEHAVIOR_CHECKPOINT=/tmp/spark/checkpoints/luckyanjun_user_behavior_demo_$(date +%Y%m%d_%H%M%S)
+export STREAMING_TRIGGER_INTERVAL="2 seconds"
 export REALTIME_WEB_PORT=18080
 
 bash start_user_behavior_streaming.sh
@@ -165,28 +169,44 @@ bash start_user_behavior_streaming.sh
 [STARTED] LuckyAnJun realtime analysis
 ```
 
-终端 B：回放数据。
+终端 B：生成并回放更直观的 demo 数据。
 
 ```bash
 cd SparkMain-LuckyAnJun
 
+python3 - <<'PY'
+import time
+
+base = int(time.time()) // 300 * 300
+behaviors = ["pv", "pv", "pv", "cart", "fav", "buy"]
+rows = []
+
+for window_no in range(18):
+    window_start = base + window_no * 300
+    for i in range(40):
+        user_id = 100000 + window_no * 100 + i
+        item_id = 200000 + (window_no % 8) * 10 + (i % 10)
+        category_id = 500 + (window_no % 6)
+        behavior = behaviors[(i + window_no) % len(behaviors)]
+        event_ts = window_start + (i % 240)
+        rows.append(f"{user_id},{item_id},{category_id},{behavior},{event_ts}")
+
+path = "/tmp/UserBehavior_realtime_demo.csv"
+with open(path, "w", encoding="utf-8") as f:
+    f.write("\n".join(rows) + "\n")
+print(path, len(rows), "rows")
+PY
+
 bash replay_user_behavior.sh \
-  dataset_test/UserBehavior.csv \
-  taobao_behavior \
+  /tmp/UserBehavior_realtime_demo.csv \
+  taobao_behavior_demo \
   localhost:9092 \
-  200
+  30 \
+  0
 ```
 
-如果要让页面变化更明显，可以用生产抽样数据并限制回放行数：
-
-```bash
-bash replay_user_behavior.sh \
-  dataset/UserBehavior.csv \
-  taobao_behavior \
-  localhost:9092 \
-  20 \
-  5000
-```
+第 4 个参数 `30` 表示每 30 毫秒回放一条消息。18 个连续窗口、720 条
+消息大约 20 多秒回放完，足够现场看到页面连续刷新。
 
 ### 4.2 页面演示
 
