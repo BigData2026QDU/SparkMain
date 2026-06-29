@@ -4,7 +4,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 
 /**
- * Scala Spark implementation for LuckyAnJun issue #15.
+ * LuckyAnJun issue #15: strict user-item funnel.
  *
  * Usage:
  *   spark-submit --class org.example.analysis.UserBehaviorFunnelJob <jar> \
@@ -17,89 +17,75 @@ object UserBehaviorFunnelJob {
     val outputBasePath = args.lift(2).getOrElse("/user/hive/bigdata_ana")
 
     val spark = SparkSession.builder()
-      .appName("LuckyAnJun-UserBehaviorFunnelJob")
+      .appName("LuckyAnJun-StrictItemFunnel")
       .enableHiveSupport()
       .getOrCreate()
+    import spark.implicits._
 
     try {
       spark.sql(s"USE $database")
 
-      val dwd = spark.table(sourceTable)
-        .filter(col("user_id").isNotNull)
-        .filter(col("event_date").isNotNull && col("event_date") =!= "event_date")
+      val events = spark.table(sourceTable)
+        .select(
+          col("user_id").cast("long").as("user_id"),
+          col("item_id").cast("long").as("item_id"),
+          lower(col("behavior_type")).as("behavior_type"),
+          col("timestamp").cast("long").as("event_ts"))
+        .filter(col("user_id").isNotNull && col("user_id") > 0)
+        .filter(col("item_id").isNotNull && col("item_id") > 0)
+        .filter(col("event_ts").isNotNull)
         .filter(col("behavior_type").isin("pv", "fav", "cart", "buy"))
 
-      val userFlags = dwd
-        .groupBy("user_id")
+      val firstPv = events
+        .groupBy("user_id", "item_id")
+        .agg(min(when(col("behavior_type") === "pv", col("event_ts"))).as("first_pv_ts"))
+        .filter(col("first_pv_ts").isNotNull)
+
+      val firstIntentAfterPv = events
+        .join(firstPv, Seq("user_id", "item_id"))
+        .filter(col("event_ts") >= col("first_pv_ts"))
+        .groupBy("user_id", "item_id")
         .agg(
-          max(when(col("behavior_type") === "pv", 1).otherwise(0)).as("has_pv"),
-          max(when(col("behavior_type").isin("fav", "cart"), 1).otherwise(0)).as("has_intent"),
-          max(when(col("behavior_type") === "buy", 1).otherwise(0)).as("has_buy")
-        )
+          min(when(col("behavior_type").isin("fav", "cart"), col("event_ts")))
+            .as("first_intent_after_pv_ts"))
+        .filter(col("first_intent_after_pv_ts").isNotNull)
 
-      val overall = addFunnelRates(aggregateFlags(userFlags))
-      writeResultTable(spark, overall, database, "lb_funnel_overall", s"$outputBasePath/lb_funnel_overall")
+      val buyAfterIntent = events
+        .filter(col("behavior_type") === "buy")
+        .join(firstIntentAfterPv, Seq("user_id", "item_id"))
+        .filter(col("event_ts") >= col("first_intent_after_pv_ts"))
+        .select("user_id", "item_id")
+        .distinct()
 
-      val dailyFlags = dwd
-        .groupBy("event_date", "user_id")
-        .agg(
-          max(when(col("behavior_type") === "pv", 1).otherwise(0)).as("has_pv"),
-          max(when(col("behavior_type").isin("fav", "cart"), 1).otherwise(0)).as("has_intent"),
-          max(when(col("behavior_type") === "buy", 1).otherwise(0)).as("has_buy")
-        )
+      val viewedPairs = firstPv.count()
+      val intentPairs = firstIntentAfterPv.count()
+      val buyAfterIntentPairs = buyAfterIntent.count()
 
-      val dailyCounts = dailyFlags
-        .groupBy("event_date")
-        .agg(
-          sum(when(col("has_pv") === 1, 1).otherwise(0)).cast("long").as("pv_users"),
-          sum(when(col("has_intent") === 1, 1).otherwise(0)).cast("long").as("intent_users"),
-          sum(when(col("has_buy") === 1, 1).otherwise(0)).cast("long").as("buy_users"),
-          sum(when(col("has_pv") === 1 && col("has_intent") === 1, 1).otherwise(0)).cast("long").as("pv_to_intent_users"),
-          sum(when(col("has_intent") === 1 && col("has_buy") === 1, 1).otherwise(0)).cast("long").as("intent_to_buy_users"),
-          sum(when(col("has_pv") === 1 && col("has_buy") === 1, 1).otherwise(0)).cast("long").as("pv_to_buy_users"),
-          sum(when(col("has_pv") === 1 && col("has_intent") === 0, 1).otherwise(0)).cast("long").as("pv_loss_users"),
-          sum(when(col("has_intent") === 1 && col("has_buy") === 0, 1).otherwise(0)).cast("long").as("intent_loss_users")
-        )
+      val itemPathStage = Seq(
+        (1, "浏览商品", viewedPairs, 1.0),
+        (2, "浏览后收藏/加购同商品", intentPairs, safeRate(intentPairs, viewedPairs)),
+        (3, "意向后购买同商品", buyAfterIntentPairs, safeRate(buyAfterIntentPairs, viewedPairs))
+      ).toDF("stage_order", "stage_name", "pair_cnt", "conversion_rate")
 
-      val daily = addFunnelRates(dailyCounts)
-      writeResultTable(spark, daily, database, "lb_funnel_daily", s"$outputBasePath/lb_funnel_daily")
+      writeResultTable(
+        spark,
+        itemPathStage,
+        database,
+        "lb_funnel_item_path_stage",
+        s"$outputBasePath/lb_funnel_item_path_stage")
 
-      println("[SUCCESS] Funnel analysis completed")
-      overall.show(truncate = false)
-      daily.orderBy("event_date").show(20, truncate = false)
+      println("[SUCCESS] Strict item funnel completed")
+      itemPathStage.orderBy("stage_order").show(3, truncate = false)
     } finally {
       spark.stop()
     }
   }
 
-  private def aggregateFlags(flags: org.apache.spark.sql.DataFrame): org.apache.spark.sql.DataFrame = {
-    flags.agg(
-      sum(when(col("has_pv") === 1, 1).otherwise(0)).cast("long").as("pv_users"),
-      sum(when(col("has_intent") === 1, 1).otherwise(0)).cast("long").as("intent_users"),
-      sum(when(col("has_buy") === 1, 1).otherwise(0)).cast("long").as("buy_users"),
-      sum(when(col("has_pv") === 1 && col("has_intent") === 1, 1).otherwise(0)).cast("long").as("pv_to_intent_users"),
-      sum(when(col("has_intent") === 1 && col("has_buy") === 1, 1).otherwise(0)).cast("long").as("intent_to_buy_users"),
-      sum(when(col("has_pv") === 1 && col("has_buy") === 1, 1).otherwise(0)).cast("long").as("pv_to_buy_users"),
-      sum(when(col("has_pv") === 1 && col("has_intent") === 0, 1).otherwise(0)).cast("long").as("pv_loss_users"),
-      sum(when(col("has_intent") === 1 && col("has_buy") === 0, 1).otherwise(0)).cast("long").as("intent_loss_users")
-    )
-  }
-
-  private def addFunnelRates(df: org.apache.spark.sql.DataFrame): org.apache.spark.sql.DataFrame = {
-    df
-      .withColumn("pv_to_intent_rate", rate("pv_to_intent_users", "pv_users"))
-      .withColumn("intent_to_buy_rate", rate("intent_to_buy_users", "intent_users"))
-      .withColumn("pv_to_buy_rate", rate("pv_to_buy_users", "pv_users"))
-      .withColumn("pv_loss_rate", rate("pv_loss_users", "pv_users"))
-      .withColumn("intent_loss_rate", rate("intent_loss_users", "intent_users"))
-  }
-
-  private def rate(numerator: String, denominator: String) = {
-    round(
-      when(col(denominator) === 0, lit(0.0))
-        .otherwise(col(numerator).cast("double") / col(denominator).cast("double")),
-      4
-    )
+  private def safeRate(numerator: Long, denominator: Long): Double = {
+    if (denominator == 0L) 0.0
+    else BigDecimal(numerator.toDouble / denominator.toDouble)
+      .setScale(6, BigDecimal.RoundingMode.HALF_UP)
+      .toDouble
   }
 
   private def writeResultTable(

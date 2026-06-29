@@ -23,24 +23,10 @@ object SmokeTest {
 
   // LuckyAnJun 分析表：只需存在（测试数据极小，部分聚合可能为空）
   private val OutputTables: Set[String] = Set(
-    "lb_funnel_overall",
-    "lb_time_hourly_behavior",
+    "lb_funnel_item_path_stage",
     "lb_time_hour_distribution",
-    "lb_time_weekday_hour_heatmap",
-    "lb_time_high_conversion_slots",
-    "lb_time_low_conversion_slots",
-    "lb_category_efficiency",
-    "lb_item_efficiency",
     "lb_category_topn",
-    "lb_item_topn",
-    "lb_category_conversion_rank",
-    "lb_category_low_conversion",
-    "lb_item_long_tail",
-    "lb_user_segment_summary",
-    "lb_user_active_day_distribution",
-    "lb_user_retention",
-    "lb_user_retention_heatmap",
-    "lb_repurchase_behavior_depth"
+    "lb_user_active_day_distribution"
   )
 
   def main(args: Array[String]): Unit = {
@@ -270,6 +256,7 @@ object SmokeTest {
       }
     }
 
+    var outputPass = true
     for (tableName <- OutputTables.toList.sorted) {
       if (existing.contains(tableName)) {
         val count = spark.sql(s"SELECT COUNT(*) FROM $tableName")
@@ -277,12 +264,15 @@ object SmokeTest {
         // LuckyAnJun 表：测试数据极小，0 行不视为失败
         println(s"[${if (count > 0) "PASS" else "INFO"}] Table $tableName: $count rows")
       } else {
-        println(s"[WARN] Table $tableName: not found (SQL may have failed)")
+        println(s"[FAIL] Table $tableName: not found")
+        outputPass = false
       }
     }
 
     if (!corePass)
       throw new RuntimeException("Core output tables are missing or empty")
+    if (!outputPass)
+      throw new RuntimeException("LuckyAnJun output tables are missing")
   }
 
   // ---- 工具方法 ----
@@ -292,18 +282,18 @@ object SmokeTest {
     val buf = new StringBuilder
     val statements = scala.collection.mutable.ArrayBuffer.empty[String]
     for (line <- sqlText.split("\n")) {
-      val stripped = line.strip
+      val stripped = line.trim
       if (!stripped.startsWith("--")) {
         buf.append(line).append('\n')
         if (stripped.endsWith(";")) {
-          var stmt = buf.toString().strip
+          var stmt = buf.toString().trim
           if (stmt.endsWith(";")) stmt = stmt.dropRight(1)
           statements += stmt
           buf.clear()
         }
       }
     }
-    val remaining = buf.toString().strip
+    val remaining = buf.toString().trim
     if (remaining.nonEmpty) statements += remaining
     statements
   }

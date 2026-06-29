@@ -14,7 +14,7 @@
 
 ## 2. 批处理展示材料
 
-### 2.1 #15 用户行为整体漏斗概况
+### 2.1 #15 严格同商品路径漏斗
 
 代码入口：
 
@@ -23,8 +23,7 @@
 
 结果表：
 
-- `lb_funnel_overall`
-- `lb_funnel_overall_stage`（图表展示用，由整体漏斗宽表重排为三行）
+- `lb_funnel_item_path_stage`
 
 网站报告：
 
@@ -33,9 +32,10 @@
 讲解重点：
 
 - `pv` 表示浏览，`fav` 和 `cart` 合并为意向行为，`buy` 表示购买。
-- 整体浏览用户 55611，意向用户 48831，购买用户 38019。
-- 报表只保留整体漏斗概况，图表横轴是浏览用户、意向用户、购买用户三个阶段。
-- 转化率在文字说明中讲，图表只画阶段用户数，避免宽表多指标柱状图看不清。
+- 原来的用户阶段到达漏斗不是严格路径，所以转化率偏高；答辩时主动说明这个口径差异。
+- 新报表使用用户-商品对和时间顺序：浏览同商品 -> 收藏/加购同商品 -> 购买同商品。
+- 浏览商品对 6085537，浏览后意向 97398，意向后购买 8835。
+- 浏览到意向转化率 1.60%，意向后购买率 9.07%，浏览后经意向购买率 0.15%。
 
 ### 2.2 #16 逐小时流量与购买比例
 
@@ -107,8 +107,7 @@
 
 ```bash
 mysql -h 47.104.27.184 -P 3306 -u test -p test_db -e "
-SELECT 'lb_funnel_overall' AS table_name, COUNT(*) AS rows_cnt FROM lb_funnel_overall
-UNION ALL SELECT 'lb_funnel_overall_stage', COUNT(*) FROM lb_funnel_overall_stage
+SELECT 'lb_funnel_item_path_stage' AS table_name, COUNT(*) AS rows_cnt FROM lb_funnel_item_path_stage
 UNION ALL SELECT 'lb_time_hour_distribution', COUNT(*) FROM lb_time_hour_distribution
 UNION ALL SELECT 'lb_category_topn', COUNT(*) FROM lb_category_topn
 UNION ALL SELECT 'lb_user_active_day_distribution', COUNT(*) FROM lb_user_active_day_distribution;
@@ -141,7 +140,7 @@ http://47.104.27.184:8317/hivehbase
 现场分两个终端。为了让页面变化明显，建议不要直接用很小的
 `dataset_test/UserBehavior.csv`，而是现场生成一份按时间递增的 demo CSV。
 这样 Spark 每个 micro-batch 都会处理新的 5 分钟窗口，页面上的窗口时间、
-PV、转化率、热门类目和热门商品都会持续变化。
+PV、收藏、加购、购买和异常预警都会持续变化。
 
 终端 A：启动实时任务。
 
@@ -222,8 +221,7 @@ http://虚拟机IP:18080/luckyanjun_realtime.html
 展示点：
 
 - 页面每 5 秒刷新一次。
-- 指标包括 PV、近似 UV、收藏数、加购数、购买数、购买用户数和浏览到购买转化率。
-- 下方显示热门类目 Top10 和热门商品 Top10。
+- 指标包括 PV、收藏数、加购数和购买行为数。
 - alert 区域展示 `normal`、`low_traffic`、`traffic_spike`、`traffic_drop` 或 `low_conversion` 等异常状态。
 
 ### 4.3 MySQL 实时结果核验
@@ -232,23 +230,10 @@ http://虚拟机IP:18080/luckyanjun_realtime.html
 
 ```bash
 mysql -h 47.104.27.184 -P 3306 -u test -p test_db -e "
-SELECT window_start, window_end, pv, approx_uv, fav_cnt, cart_cnt, buy_cnt, buy_uv, pv_to_buy_rate, alert_type
+SELECT window_start, window_end, pv, fav_cnt, cart_cnt, buy_cnt, alert_type, alert_message
 FROM lb_realtime_window_metrics
 ORDER BY updated_at DESC
 LIMIT 5;
-"
-```
-
-也可以查实时 Top 表：
-
-```bash
-mysql -h 47.104.27.184 -P 3306 -u test -p test_db -e "
-SELECT * FROM lb_realtime_category_top10
-ORDER BY window_start DESC, rank_no
-LIMIT 10;
-SELECT * FROM lb_realtime_item_top10
-ORDER BY window_start DESC, rank_no
-LIMIT 10;
 "
 ```
 
@@ -260,7 +245,7 @@ LIMIT 10;
 
 实时处理可以这样说：
 
-> 实时部分我用历史 UserBehavior 日志做实时回放模拟。回放程序把每条用户行为写入 Kafka topic，Spark Structured Streaming 消费 Kafka 数据，按 5 分钟事件时间窗口计算 PV、UV、收藏、加购、购买、转化率和热门类目商品，并把结果写入 MySQL，同时生成页面读取的 JSON 快照。现在我现场启动回放，可以看到页面指标随 micro-batch 更新。
+> 实时部分我用历史 UserBehavior 日志做实时回放模拟。回放程序把每条用户行为写入 Kafka topic，Spark Structured Streaming 消费 Kafka 数据，按 5 分钟事件时间窗口计算 PV、收藏、加购和购买行为次数，同时识别流量突增、流量骤降、低流量和低转化。结果写入 MySQL 并生成页面读取的 JSON 快照，现在启动回放即可看到指标随 micro-batch 更新。
 
 ## 6. 现场风险和兜底
 

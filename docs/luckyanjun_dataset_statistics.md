@@ -173,25 +173,12 @@ PV (100%) → 意向[c+cart+fav] (8.41%) → 购买 (2.01%)
 
 | 结果表 | 行数 | 对应 Issue |
 |--------|------|------------|
-| `lb_funnel_overall` | 1 | #15 漏斗总览 |
-| `lb_funnel_daily` | 9 | #15 每日漏斗 |
-| `lb_time_hourly_behavior` | 216 | #16 时段行为 |
+| `lb_funnel_item_path_stage` | 3 | #15 严格同商品路径漏斗 |
 | `lb_time_hour_distribution` | 24 | #16 小时分布 |
-| `lb_time_weekday_hour_heatmap` | 168 | #16 星期×小时热力图 |
-| `lb_time_high_conversion_slots` | 10 | #16 高转化时段 |
-| `lb_time_low_conversion_slots` | 10 | #16 低转化时段 |
-| `lb_category_efficiency` | 7,392 | #17 类目效率 |
 | `lb_category_topn` | 20 | #17 热门类目 |
-| `lb_item_topn` | 20 | #17 热门商品 |
-| `lb_category_conversion_rank` | 20 | #17 类目转化排名 |
-| `lb_category_low_conversion` | 20 | #17 低转化类目 |
-| `lb_user_segment_summary` | 5 | #18 用户分层 |
 | `lb_user_active_day_distribution` | 9 | #18 活跃天数分布 |
-| `lb_user_retention` | 8 | #18 留存分析 |
-| `lb_user_retention_heatmap` | 24 | #18 留存热力图 |
-| `lb_repurchase_behavior_depth` | 2 | #18 复购行为深度 |
 
-> 离线分析共导出 **17 张结果表**，覆盖 4 个分析方向（漏斗转化、时段高峰、类目商品效率、用户分层留存）。
+> 最终离线分析只导出 **4 张报表表**，每个离线报告对应一张表。
 
 ---
 

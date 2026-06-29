@@ -22,6 +22,7 @@ Thumbs.db
 # 依赖管理工具缓存
 .gradle/
 .mvn/
+.codex/report-bus/
 
 # Python
 __pycache__/

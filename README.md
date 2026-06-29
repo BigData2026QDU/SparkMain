@@ -252,10 +252,10 @@ streaming.trigger.interval=10 seconds
 
 | Issue | 报表 | 结果表 |
 |------|------|------|
-| #15 | 用户行为漏斗与转化流失分析 | `lb_funnel_overall`, `lb_funnel_daily` |
-| #16 | 时段流量与购买高峰分析 | `lb_time_hourly_behavior`, `lb_time_weekday_hour_heatmap` |
-| #17 | 类目热度与商品转化效率分析 | `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail` |
-| #18 | 用户分层、留存与短期复购分析 | `lb_user_segments`, `lb_user_segment_summary`, `lb_user_retention` |
+| #15 | 严格同商品路径漏斗 | `lb_funnel_item_path_stage` |
+| #16 | 逐小时流量与购买比例 | `lb_time_hour_distribution` |
+| #17 | 热门类目 Top20 | `lb_category_topn` |
+| #18 | 用户活跃天数分布 | `lb_user_active_day_distribution` |
 
 数据字典见 `docs/luckyanjun_userbehavior_data_dictionary.md`，运行说明见 `docs/luckyanjun_userbehavior_runbook.md`。
 
@@ -268,11 +268,11 @@ bash start_user_behavior_streaming.sh
 bash replay_user_behavior.sh dataset_test/UserBehavior.csv taobao_behavior localhost:9092 200
 ```
 
-实时窗口指标包括 PV、近似 UV、收藏数、加购数、购买数、购买用户数、转化率、热门类目/商品和异常预警。
+实时窗口指标只保留 PV、收藏数、加购数、购买行为数和异常预警。
 
 ### 动态展示
 
-`web/luckyanjun_realtime.html` 每 5 秒读取 Spark 生成的实时 JSON 快照，展示窗口指标、热门类目、热门商品和异常预警。默认地址为 `http://192.168.211.101:18080/luckyanjun_realtime.html`。
+`web/luckyanjun_realtime.html` 每 5 秒读取 Spark 生成的实时 JSON 快照，展示窗口行为指标和异常预警。默认地址为 `http://192.168.211.101:18080/luckyanjun_realtime.html`。
 
 ## 项目结构
 

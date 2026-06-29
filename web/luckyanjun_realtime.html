@@ -43,7 +43,7 @@
       gap: 12px;
       margin-bottom: 16px;
     }
-    .metric, .panel {
+    .metric {
       background: #ffffff;
       border: 1px solid #dfe4e8;
       border-radius: 6px;
@@ -51,20 +51,10 @@
     .metric { min-height: 102px; padding: 14px; }
     .metric span { display: block; color: #66727d; font-size: 12px; }
     .metric strong { display: block; margin-top: 10px; font-size: 26px; letter-spacing: 0; }
-    .tables { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .panel { padding: 16px; overflow: hidden; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 9px 8px; text-align: right; border-bottom: 1px solid #edf0f2; }
-    th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
-    th { color: #66727d; font-weight: 600; }
-    .bar-track { width: 100%; height: 5px; background: #e8edf0; }
-    .bar { height: 5px; background: #1677b8; }
-    .empty { padding: 24px 0; color: #7b8790; text-align: center; }
     @media (max-width: 760px) {
       header { align-items: flex-start; flex-direction: column; padding: 16px; }
       main { padding: 14px 16px 24px; }
       .metrics { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
-      .tables { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -82,53 +72,20 @@
       <span id="alert-message"></span>
     </div>
     <section class="metrics" id="metrics"></section>
-    <div class="tables">
-      <section class="panel">
-        <h2>热门类目 Top10</h2>
-        <div id="category-table"></div>
-      </section>
-      <section class="panel">
-        <h2>热门商品 Top10</h2>
-        <div id="item-table"></div>
-      </section>
-    </div>
   </main>
   <script>
     const metricDefinitions = [
       ['pv', 'PV'],
-      ['approx_uv', '近似 UV'],
       ['fav_cnt', '收藏数'],
       ['cart_cnt', '加购数'],
-      ['buy_cnt', '购买行为数'],
-      ['buy_uv', '购买用户数'],
-      ['pv_to_buy_rate', '浏览到购买转化率']
+      ['buy_cnt', '购买行为数']
     ];
 
     function renderMetrics(metrics) {
       document.getElementById('metrics').innerHTML = metricDefinitions.map(([key, label]) => {
-        const value = key === 'pv_to_buy_rate'
-          ? `${((metrics[key] || 0) * 100).toFixed(2)}%`
-          : Number(metrics[key] || 0).toLocaleString();
+        const value = Number(metrics[key] || 0).toLocaleString();
         return `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`;
       }).join('');
-    }
-
-    function renderTop(targetId, rows, idKey) {
-      const target = document.getElementById(targetId);
-      if (!rows.length) {
-        target.innerHTML = '<div class="empty">暂无数据</div>';
-        return;
-      }
-      const maximum = Math.max(...rows.map(row => row.event_cnt), 1);
-      target.innerHTML = `<table>
-        <thead><tr><th>排名</th><th>ID</th><th>事件数</th><th>购买数</th></tr></thead>
-        <tbody>${rows.map(row => `<tr>
-          <td>${row.rank}</td>
-          <td>${row[idKey]}<div class="bar-track"><div class="bar" style="width:${row.event_cnt / maximum * 100}%"></div></div></td>
-          <td>${row.event_cnt}</td>
-          <td>${row.buy_cnt}</td>
-        </tr>`).join('')}</tbody>
-      </table>`;
     }
 
     function renderAlert(metrics) {
@@ -147,8 +104,6 @@
         const data = await response.json();
         if (!data.metrics) throw new Error('等待首个 Spark micro-batch');
         renderMetrics(data.metrics);
-        renderTop('category-table', data.category_top10 || [], 'category_id');
-        renderTop('item-table', data.item_top10 || [], 'item_id');
         renderAlert(data.metrics);
         document.getElementById('window-label').textContent =
           `${data.metrics.window_start} 至 ${data.metrics.window_end}`;

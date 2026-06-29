@@ -36,19 +36,11 @@ object UserBehaviorRealtimeSmokeTest {
       assert(row.getAs[Long]("cart_cnt") == 1L)
       assert(row.getAs[Long]("buy_cnt") == 2L)
 
-      val categories = UserBehaviorRealtimeJob
-        .aggregateObjects(windowed, "category_id")
-        .collect()
-      assert(categories.length == 1)
-      assert(categories.head.getAs[Long]("event_cnt") == 6L)
-      assert(categories.head.getAs[Long]("buy_cnt") == 2L)
-
-      val items = UserBehaviorRealtimeJob
-        .aggregateObjects(windowed, "item_id")
-        .orderBy(col("item_id"))
-        .collect()
-      assert(items.length == 2)
-      assert(items.forall(_.getAs[Long]("event_cnt") == 3L))
+      assert(UserBehaviorRealtimeJob.classifyAlert(20L, 1L, Some(5L), 5L)._1 == "traffic_spike")
+      assert(UserBehaviorRealtimeJob.classifyAlert(4L, 1L, Some(20L), 5L)._1 == "traffic_drop")
+      assert(UserBehaviorRealtimeJob.classifyAlert(4L, 0L, None, 5L)._1 == "low_traffic")
+      assert(UserBehaviorRealtimeJob.classifyAlert(200L, 1L, Some(150L), 5L)._1 == "low_conversion")
+      assert(UserBehaviorRealtimeJob.classifyAlert(100L, 1L, Some(100L), 5L)._1 == "normal")
 
       println("[SUCCESS] UserBehaviorRealtimeSmokeTest passed")
     } finally {

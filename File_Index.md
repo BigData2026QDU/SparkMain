@@ -16,7 +16,7 @@
 | test_user_behavior_realtime.sh | Scala测试脚本 | 执行 5 分钟窗口与热门对象 smoke test |
 | export_user_behavior_mysql.sh | 离线结果导出脚本 | 将 17 张 Hive 汇总表原子发布到 MySQL |
 | start_user_behavior_streaming_remote.sh | 远程实时启动脚本 | 从受保护凭据文件读取密码并写入共享 MySQL |
-| initializeSQL/02_luckyanjun_realtime_mysql.sql | MySQL初始化 | 创建实时窗口、Top10 和幂等批次表 |
+| initializeSQL/02_luckyanjun_realtime_mysql.sql | MySQL初始化 | 创建实时窗口指标和幂等批次表 |
 | .gitignore | Git忽略配置 | 忽略IDE、构建产物等 |
 | .gitmodules | Git submodule配置 | AGENTS submodule配置 |
 
@@ -27,10 +27,10 @@
 | cleanPy/clean_user_behavior.py | 生产清洗脚本 | 清洗 `dataset/UserBehavior.csv` |
 | cleanPy_test/clean_user_behavior.py | 测试清洗脚本 | 清洗 KB 级测试数据 |
 | dataset_test/UserBehavior.csv | 轻量测试数据 | 用于测试流水线和 CI |
-| jobSQL/06_luckyanjun_funnel_conversion.sql | 离线报表 | 转化漏斗与流失分析 |
-| jobSQL/07_luckyanjun_time_peak.sql | 离线报表 | 时段流量与购买高峰 |
-| jobSQL/08_luckyanjun_category_item_efficiency.sql | 离线报表 | 类目和商品转化效率 |
-| jobSQL/09_luckyanjun_user_segment_retention.sql | 离线报表 | 用户分层、留存与短期复购 |
+| jobSQL/06_luckyanjun_funnel_conversion.sql | 离线报表 | 严格同商品路径漏斗 |
+| jobSQL/07_luckyanjun_time_peak.sql | 离线报表 | 逐小时流量与购买比例 |
+| jobSQL/08_luckyanjun_category_item_efficiency.sql | 离线报表 | 热门类目 Top20 |
+| jobSQL/09_luckyanjun_user_segment_retention.sql | 离线报表 | 用户活跃天数分布 |
 | docs/luckyanjun_userbehavior_data_dictionary.md | 数据字典 | 字段、清洗规则和边界说明 |
 | docs/luckyanjun_rawdata_dictionary.md | 原始数据字典 | 原始数据集字段定义、质量报告与分布统计 |
 | docs/luckyanjun_dataset_statistics.md | 数据集统计报告 | 全量数据集统计（原始/截断/测试/清洗/结果表） |
@@ -38,14 +38,14 @@
 | docs/luckyanjun_mysql_contract.md | MySQL数据契约 | 前后端表名、字段、行数和接口映射 |
 | SparkMain/src/main/scala/org/bigdata/export/UserBehaviorMySQLExportJob.scala | Scala导出作业 | Hive 汇总结果经 staging 校验后发布到 MySQL |
 | web/luckyanjun_dashboard.html | 动态页面骨架 | 5 秒刷新接口数据 |
-| web/luckyanjun_realtime.html | 实时监控页面 | 每 5 秒刷新窗口指标、Top10 和预警 |
+| web/luckyanjun_realtime.html | 实时监控页面 | 每 5 秒刷新 PV、收藏、加购、购买和预警 |
 | SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorRealtimeJob.scala | Scala实时作业 | Kafka 5 分钟窗口聚合并写入 MySQL |
 | SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorReplayProducer.scala | Scala回放器 | 将历史 CSV 逐条发送到 Kafka |
 | SparkMain/src/main/java/org/example/analysis/UserBehaviorCleanJob.scala | Scala Spark 清洗作业 | 清洗 `UserBehavior.csv` 并生成 Hive 明细表 |
-| SparkMain/src/main/java/org/example/analysis/UserBehaviorFunnelJob.scala | Scala Spark 漏斗作业 | 生成 #15 整体和每日漏斗结果表 |
-| SparkMain/src/main/java/org/example/analysis/UserBehaviorTimePeakJob.scala | Scala Spark 时段分析作业 | 生成 #16 日期小时、24 小时分布、星期小时热力图和高低转化时段结果表 |
-| SparkMain/src/main/java/org/example/analysis/UserBehaviorCategoryItemJob.scala | Scala Spark 商品类目作业 | 生成 #17 类目/商品 TopN、转化排名、低转化类目和长尾贡献结果表 |
-| SparkMain/src/main/java/org/example/analysis/UserBehaviorSegmentRetentionJob.scala | Scala Spark 用户分层作业 | 生成 #18 用户分层占比、活跃分布、留存热力图和复购深度对比结果表 |
+| SparkMain/src/main/java/org/example/analysis/UserBehaviorFunnelJob.scala | Scala Spark 漏斗作业 | 生成 #15 严格同商品路径漏斗 |
+| SparkMain/src/main/java/org/example/analysis/UserBehaviorTimePeakJob.scala | Scala Spark 时段分析作业 | 生成 #16 逐小时流量与购买比例 |
+| SparkMain/src/main/java/org/example/analysis/UserBehaviorCategoryItemJob.scala | Scala Spark 类目作业 | 生成 #17 热门类目 Top20 |
+| SparkMain/src/main/java/org/example/analysis/UserBehaviorSegmentRetentionJob.scala | Scala Spark 活跃度作业 | 生成 #18 用户活跃天数分布 |
 
 ## SparkMain/ 目录
 

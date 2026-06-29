@@ -27,11 +27,10 @@ Scala 分析作业位于
 
 主要结果表：
 
-- `lb_funnel_overall`, `lb_funnel_daily`
-- `lb_time_hourly_behavior`, `lb_time_weekday_hour_heatmap`
-- `lb_category_efficiency`, `lb_item_efficiency`, `lb_item_long_tail`
-- `lb_user_segments`, `lb_user_segment_summary`
-- `lb_user_retention`, `lb_user_retention_heatmap`
+- `lb_funnel_item_path_stage`
+- `lb_time_hour_distribution`
+- `lb_category_topn`
+- `lb_user_active_day_distribution`
 
 ## 实时任务
 
@@ -85,10 +84,6 @@ bash replay_user_behavior.sh \
 MySQL 表：
 
 - `lb_realtime_window_metrics`
-- `lb_realtime_category_top10`
-- `lb_realtime_item_top10`
-- `lb_realtime_category_stats`
-- `lb_realtime_item_stats`
 
 页面：
 
@@ -96,8 +91,8 @@ MySQL 表：
 http://192.168.211.101:18080/luckyanjun_realtime.html
 ```
 
-页面每 5 秒读取 Spark 更新的 `web/data/realtime.json`，展示 5 分钟窗口指标、
-热门类目、热门商品和异常预警。
+页面每 5 秒读取 Spark 更新的 `web/data/realtime.json`，展示 5 分钟窗口内的
+PV、收藏、加购、购买和异常预警。
 
 ## 共享 MySQL
 
@@ -110,7 +105,7 @@ ssh -N -R 13306:47.104.27.184:3306 master@192.168.211.101
 虚拟机通过 `127.0.0.1:13306/test_db` 访问共享数据库。密码只保存在权限为
 `600` 的 `/home/master/.sparkmain_mysql.env`，不能提交到 Git。
 
-导出 17 张离线展示表：
+导出 4 张离线展示表：
 
 ```bash
 bash export_user_behavior_mysql.sh
@@ -133,9 +128,8 @@ batch ID 保证重试幂等。
 ## 指标边界
 
 - `buy` 表示购买行为次数，不表示订单金额、销售额或 GMV。
-- UV 通过窗口内用户去重获得，结果字段沿用验收名称 `approx_uv`。
-- 浏览到购买转化率为购买用户数除以浏览用户数。
-- 热门类目和商品按窗口内行为总数排序，购买数作为次级排序依据。
+- PV、收藏、加购、购买均为窗口内行为次数。
+- 低转化按购买次数 / PV 小于 1% 判断。
 - 异常规则覆盖流量突增、流量骤降、低流量和低转化。
 
 ## 测试
@@ -147,4 +141,4 @@ bash test_user_behavior_realtime.sh
 ```
 
 静态聚合测试和集成验收都必须在虚拟机执行；集成验收还需实际启动 Kafka、
-Spark 和 MySQL，并查询上述三张核心结果表。
+Spark 和 MySQL，并查询 `lb_realtime_window_metrics`。
