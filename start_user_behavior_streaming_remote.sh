@@ -27,6 +27,5 @@ export MYSQL_CREATE_DATABASE=false
 export KAFKA_USER_BEHAVIOR_TOPIC="${KAFKA_USER_BEHAVIOR_TOPIC:-taobao_behavior}"
 export KAFKA_STARTING_OFFSETS="${KAFKA_STARTING_OFFSETS:-latest}"
 export USER_BEHAVIOR_CHECKPOINT="${USER_BEHAVIOR_CHECKPOINT:-/tmp/spark/checkpoints/luckyanjun_user_behavior_remote}"
-export REALTIME_WEB_PORT="${REALTIME_WEB_PORT:-18080}"
 
 exec bash "$ROOT_DIR/start_user_behavior_streaming.sh"

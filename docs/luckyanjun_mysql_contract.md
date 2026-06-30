@@ -38,6 +38,16 @@
 | `alert_type`, `alert_message` | 流量或转化异常 |
 | `updated_at` | Spark 最近更新时间 |
 
+### `lb_realtime_blog_metrics`
+
+Blog 报告 #19 的公开实时表，只保留最近 12 个窗口并按窗口时间升序排列。
+字段包括 `window_label`, `pv`, `fav_cnt`, `cart_cnt`, `buy_cnt` 和
+`alert_level`。异常等级定义为：
+
+- `0`：正常
+- `1`：低流量或低转化提醒
+- `2`：流量突增或流量骤降
+
 ## 实时内部表
 
 - `lb_realtime_batches`
@@ -52,7 +62,7 @@
 | 逐小时流量与购买比例 | `lb_time_hour_distribution` |
 | 热门类目 Top20 | `lb_category_topn` |
 | 用户活跃天数分布 | `lb_user_active_day_distribution` |
-| 实时指标 | `lb_realtime_window_metrics` 最新窗口 |
+| 实时指标 | `lb_realtime_blog_metrics` 最近 12 个窗口 |
 
 实时任务是历史日志回放模拟。前端应同时显示事件窗口和更新时间，不能把
 2017 年事件时间描述为当前真实淘宝流量。

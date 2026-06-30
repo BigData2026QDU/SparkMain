@@ -272,7 +272,9 @@ bash replay_user_behavior.sh dataset_test/UserBehavior.csv taobao_behavior local
 
 ### 动态展示
 
-`web/luckyanjun_realtime.html` 每 5 秒读取 Spark 生成的实时 JSON 快照，展示窗口行为指标和异常预警。默认地址为 `http://192.168.211.101:18080/luckyanjun_realtime.html`。
+报告 #19 的图表块启用 Blog 实时模式，每 1 秒重新读取
+`lb_realtime_blog_metrics`，展示最近 12 个窗口的 PV、收藏、加购、购买和
+异常等级。实时效果直接在统一报告页面展示，不再维护独立实时页面。
 
 ## 项目结构
 

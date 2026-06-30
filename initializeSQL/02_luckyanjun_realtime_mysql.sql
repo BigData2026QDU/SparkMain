@@ -18,3 +18,17 @@ CREATE TABLE IF NOT EXISTS lb_realtime_window_metrics (
     ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (window_start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS lb_realtime_blog_metrics (
+  window_start DATETIME NOT NULL,
+  window_label VARCHAR(32) NOT NULL,
+  pv BIGINT NOT NULL DEFAULT 0,
+  fav_cnt BIGINT NOT NULL DEFAULT 0,
+  cart_cnt BIGINT NOT NULL DEFAULT 0,
+  buy_cnt BIGINT NOT NULL DEFAULT 0,
+  alert_level INT NOT NULL DEFAULT 0,
+  alert_type VARCHAR(32) NOT NULL DEFAULT 'normal',
+  alert_message VARCHAR(255) NOT NULL DEFAULT '',
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (window_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -40,6 +40,17 @@ check_file_exists() {
     fi
 }
 
+check_file_not_exists() {
+    local file_path="$1"
+    if [ ! -e "$file_path" ]; then
+        echo "[PASS] Obsolete artifact removed: $file_path"
+        PASS=$((PASS + 1))
+    else
+        echo "[FAIL] Obsolete artifact still exists: $file_path"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 echo "=========================================="
 echo "1. Check base tables"
 echo "=========================================="
@@ -95,7 +106,9 @@ echo "=========================================="
 check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorRealtimeJob.scala"
 check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/UserBehaviorReplayProducer.scala"
 check_file_exists "initializeSQL/02_luckyanjun_realtime_mysql.sql"
-check_file_exists "web/luckyanjun_realtime.html"
+check_file_exists "generate_user_behavior_realtime_demo.py"
+check_file_exists "docs/luckyanjun_blog_report_issue19_realtime.sql"
+check_file_not_exists "web/luckyanjun_realtime.html"
 
 echo ""
 echo "=========================================="

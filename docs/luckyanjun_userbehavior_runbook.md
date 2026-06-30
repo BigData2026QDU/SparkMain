@@ -51,7 +51,6 @@ export MYSQL_PASSWORD='你的密码'
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_USER_BEHAVIOR_TOPIC=taobao_behavior
 export USER_BEHAVIOR_CHECKPOINT=/tmp/spark/checkpoints/luckyanjun_user_behavior
-export REALTIME_WEB_PORT=18080
 ```
 
 ### 2. 启动实时分析
@@ -60,20 +59,21 @@ export REALTIME_WEB_PORT=18080
 bash start_user_behavior_streaming.sh
 ```
 
-脚本会启动 ZooKeeper 和 Kafka、创建 topic 和 MySQL 表、编译 Scala 作业、
-启动动态页面服务，然后运行 Spark Structured Streaming。Spark 2.4.6 所需
-Kafka connector 由 `spark-submit --packages` 加载。
+脚本会启动 ZooKeeper 和 Kafka、创建 topic 和 MySQL 表、编译 Scala 作业，
+然后运行 Spark Structured Streaming。Spark 2.4.6 所需 Kafka connector
+优先使用仓库内的离线依赖。
 
 ### 3. 回放数据
 
 另开一个终端执行：
 
 ```bash
+python3 generate_user_behavior_realtime_demo.py
 bash replay_user_behavior.sh \
-  dataset_test/UserBehavior.csv \
+  /tmp/UserBehavior_realtime_demo.csv \
   taobao_behavior \
   localhost:9092 \
-  200
+  80
 ```
 
 第 4 个参数是每条消息之间的毫秒延迟。可添加第 5 个参数限制回放行数；
@@ -84,15 +84,17 @@ bash replay_user_behavior.sh \
 MySQL 表：
 
 - `lb_realtime_window_metrics`
+- `lb_realtime_blog_metrics`
 
-页面：
+统一报告页面：
 
 ```text
-http://192.168.211.101:18080/luckyanjun_realtime.html
+http://47.104.27.184:8317/hivehbase/html/show-report.html
 ```
 
-页面每 5 秒读取 Spark 更新的 `web/data/realtime.json`，展示 5 分钟窗口内的
-PV、收藏、加购、购买和异常预警。
+登录后选择报告 #19。Blog 实时图表块每 1 秒读取
+`lb_realtime_blog_metrics`，展示最近 12 个窗口的 PV、收藏、加购、购买和
+异常等级。
 
 ## 共享 MySQL
 

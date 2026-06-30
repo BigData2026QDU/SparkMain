@@ -10,7 +10,9 @@
 - 结果表已经写入 MySQL
 - 网站报告能动态读取结果表生成图表
 
-实时部分需要现场演示。建议提前把 ZooKeeper、Kafka、Spark Streaming 和页面服务启动好，现场只演示“回放数据 -> Spark 消费 -> MySQL / JSON 更新 -> 页面刷新变化”。
+实时部分需要现场演示。建议提前把 ZooKeeper、Kafka 和 Spark Streaming
+启动好，现场只演示“回放数据 -> Spark 消费 -> MySQL 最近窗口表更新 ->
+Blog 实时块每秒刷新”。
 
 ## 2. 批处理展示材料
 
@@ -132,7 +134,7 @@ http://47.104.27.184:8317/hivehbase
 - 启动脚本：`start_user_behavior_streaming.sh`
 - 远端 MySQL 启动脚本：`start_user_behavior_streaming_remote.sh`
 - 回放脚本：`replay_user_behavior.sh`
-- 页面：`web/luckyanjun_realtime.html`
+- 演示数据：`generate_user_behavior_realtime_demo.py`
 - 网站报告：`报告 #19`
 
 ### 4.1 推荐现场演示方式
@@ -147,21 +149,12 @@ PV、收藏、加购、购买和异常预警都会持续变化。
 ```bash
 cd SparkMain-LuckyAnJun
 
-export MYSQL_HOST=47.104.27.184
-export MYSQL_PORT=3306
-export MYSQL_USER=test
-export MYSQL_DATABASE=test_db
-export MYSQL_CREATE_DATABASE=false
-read -s MYSQL_PASSWORD
-export MYSQL_PASSWORD
-
 export KAFKA_USER_BEHAVIOR_TOPIC=taobao_behavior_demo
 export KAFKA_STARTING_OFFSETS=latest
 export USER_BEHAVIOR_CHECKPOINT=/tmp/spark/checkpoints/luckyanjun_user_behavior_demo_$(date +%Y%m%d_%H%M%S)
 export STREAMING_TRIGGER_INTERVAL="2 seconds"
-export REALTIME_WEB_PORT=18080
 
-bash start_user_behavior_streaming.sh
+bash start_user_behavior_streaming_remote.sh
 ```
 
 看到以下信息后，说明实时任务已启动：
@@ -176,53 +169,35 @@ bash start_user_behavior_streaming.sh
 ```bash
 cd SparkMain-LuckyAnJun
 
-python3 - <<'PY'
-import time
-
-base = int(time.time()) // 300 * 300
-behaviors = ["pv", "pv", "pv", "cart", "fav", "buy"]
-rows = []
-
-for window_no in range(18):
-    window_start = base + window_no * 300
-    for i in range(40):
-        user_id = 100000 + window_no * 100 + i
-        item_id = 200000 + (window_no % 8) * 10 + (i % 10)
-        category_id = 500 + (window_no % 6)
-        behavior = behaviors[(i + window_no) % len(behaviors)]
-        event_ts = window_start + (i % 240)
-        rows.append(f"{user_id},{item_id},{category_id},{behavior},{event_ts}")
-
-path = "/tmp/UserBehavior_realtime_demo.csv"
-with open(path, "w", encoding="utf-8") as f:
-    f.write("\n".join(rows) + "\n")
-print(path, len(rows), "rows")
-PY
+python3 generate_user_behavior_realtime_demo.py
 
 bash replay_user_behavior.sh \
   /tmp/UserBehavior_realtime_demo.csv \
   taobao_behavior_demo \
   localhost:9092 \
-  30 \
+  80 \
   0
 ```
 
-第 4 个参数 `30` 表示每 30 毫秒回放一条消息。18 个连续窗口、720 条
-消息大约 20 多秒回放完，足够现场看到页面连续刷新。
+第 4 个参数 `80` 表示每 80 毫秒回放一条消息。脚本生成 12 个连续窗口，
+并刻意安排流量突增和骤降，足够看到主图从右侧持续加入窗口以及
+`alert_level` 在 0、1、2 之间变化。
 
 ### 4.2 页面演示
 
-浏览器打开实时页面：
+浏览器打开统一报告页面：
 
 ```text
-http://虚拟机IP:18080/luckyanjun_realtime.html
+http://47.104.27.184:8317/hivehbase/html/show-report.html
 ```
 
 展示点：
 
-- 页面每 5 秒刷新一次。
+- 登录后选择报告 #19。
+- 图表块每 1 秒重新读取 MySQL。
+- 图中只保留最近 12 个窗口，新窗口从右侧出现。
 - 指标包括 PV、收藏数、加购数和购买行为数。
-- alert 区域展示 `normal`、`low_traffic`、`traffic_spike`、`traffic_drop` 或 `low_conversion` 等异常状态。
+- `alert_level`：0 正常、1 提醒、2 流量突增或骤降。
 
 ### 4.3 MySQL 实时结果核验
 
@@ -234,6 +209,8 @@ SELECT window_start, window_end, pv, fav_cnt, cart_cnt, buy_cnt, alert_type, ale
 FROM lb_realtime_window_metrics
 ORDER BY updated_at DESC
 LIMIT 5;
+
+SELECT * FROM lb_realtime_blog_metrics ORDER BY window_start;
 "
 ```
 
@@ -245,11 +222,12 @@ LIMIT 5;
 
 实时处理可以这样说：
 
-> 实时部分我用历史 UserBehavior 日志做实时回放模拟。回放程序把每条用户行为写入 Kafka topic，Spark Structured Streaming 消费 Kafka 数据，按 5 分钟事件时间窗口计算 PV、收藏、加购和购买行为次数，同时识别流量突增、流量骤降、低流量和低转化。结果写入 MySQL 并生成页面读取的 JSON 快照，现在启动回放即可看到指标随 micro-batch 更新。
+> 实时部分我用历史 UserBehavior 日志做实时回放模拟。回放程序把每条用户行为写入 Kafka topic，Spark Structured Streaming 消费 Kafka 数据，按 5 分钟事件时间窗口计算 PV、收藏、加购和购买行为次数，同时识别流量突增、流量骤降、低流量和低转化。Spark 每个 micro-batch 更新 MySQL 最近窗口表，Blog 实时图表块每秒重新查询，所以不需要单独页面即可看到指标和预警等级变化。
 
 ## 6. 现场风险和兜底
 
-- 如果现场网络连不上远端 MySQL，就展示本地实时页面和 `web/data/realtime.json` 更新。
+- 如果现场网络连不上远端 MySQL，优先检查 Windows 到虚拟机的 13306
+  反向隧道；Blog 实时演示依赖共享 MySQL。
 - 如果 Spark 启动太慢，提前启动终端 A，现场只运行终端 B 的回放命令。
 - 如果 Kafka topic 里有旧数据影响展示，设置新的 `USER_BEHAVIOR_CHECKPOINT`，并保证 `KAFKA_STARTING_OFFSETS=latest`，先启动流任务再回放。
 - 不要在投屏里展示明文数据库密码；用 `read -s MYSQL_PASSWORD` 输入。

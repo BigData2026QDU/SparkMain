@@ -1,7 +1,5 @@
 package org.bigdata.streaming
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.{AtomicMoveNotSupportedException, Files, Paths, StandardCopyOption}
 import java.sql.{Connection, DriverManager, Timestamp}
 
 import org.apache.spark.sql.functions._
@@ -10,7 +8,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 /**
- * Issue #19: Kafka -> Spark Structured Streaming -> MySQL and JSON snapshot.
+ * Issue #19: Kafka -> Spark Structured Streaming -> MySQL -> Blog.
  *
  * Historical behavior logs are replayed through Kafka and aggregated into
  * five-minute event-time windows. The public result contains only PV, favorite,
@@ -27,7 +25,6 @@ object UserBehaviorRealtimeJob {
       jdbcUrl: String,
       mysqlUser: String,
       mysqlPassword: String,
-      snapshotPath: String,
       minimumTraffic: Long)
 
   def main(args: Array[String]): Unit = {
@@ -62,7 +59,7 @@ object UserBehaviorRealtimeJob {
     println("[INFO] Kafka: " + config.bootstrapServers + "/" + config.topic)
     println("[INFO] Checkpoint: " + config.checkpointPath)
     println("[INFO] MySQL: " + config.jdbcUrl)
-    println("[INFO] Snapshot: " + config.snapshotPath)
+    println("[INFO] Blog table: lb_realtime_blog_metrics")
     query.awaitTermination()
   }
 
@@ -131,7 +128,6 @@ object UserBehaviorRealtimeJob {
         "jdbc:mysql://localhost:3306/bigdata_ana?useUnicode=true&characterEncoding=utf8&useSSL=false"),
       mysqlUser = env("MYSQL_USER", "root"),
       mysqlPassword = env("MYSQL_PASSWORD", ""),
-      snapshotPath = env("REALTIME_SNAPSHOT_PATH", "web/data/realtime.json"),
       minimumTraffic = env("REALTIME_MINIMUM_TRAFFIC", "5").toLong)
   }
 
@@ -145,16 +141,6 @@ object UserBehaviorRealtimeJob {
 }
 
 private object MySQLBatchSink {
-
-  private case class MetricsSnapshot(
-      windowStart: Timestamp,
-      windowEnd: Timestamp,
-      pv: Long,
-      favCount: Long,
-      cartCount: Long,
-      buyCount: Long,
-      alertType: String,
-      alertMessage: String)
 
   private val DdlStatements = Seq(
     """CREATE TABLE IF NOT EXISTS lb_realtime_batches (
@@ -173,6 +159,19 @@ private object MySQLBatchSink {
       |  alert_type VARCHAR(32) NOT NULL DEFAULT 'normal',
       |  alert_message VARCHAR(255) NOT NULL DEFAULT '',
       |  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      |  PRIMARY KEY (window_start)
+      |) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""".stripMargin,
+    """CREATE TABLE IF NOT EXISTS lb_realtime_blog_metrics (
+      |  window_start DATETIME NOT NULL,
+      |  window_label VARCHAR(32) NOT NULL,
+      |  pv BIGINT NOT NULL DEFAULT 0,
+      |  fav_cnt BIGINT NOT NULL DEFAULT 0,
+      |  cart_cnt BIGINT NOT NULL DEFAULT 0,
+      |  buy_cnt BIGINT NOT NULL DEFAULT 0,
+      |  alert_level INT NOT NULL DEFAULT 0,
+      |  alert_type VARCHAR(32) NOT NULL DEFAULT 'normal',
+      |  alert_message VARCHAR(255) NOT NULL DEFAULT '',
+      |  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       |  PRIMARY KEY (window_start)
       |) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""".stripMargin)
 
@@ -200,16 +199,15 @@ private object MySQLBatchSink {
         if (!claimBatch(connection, config.checkpointPath, batchId)) {
           connection.rollback()
           connection.close()
-          writeSnapshot(config)
           return
         }
 
         upsertMetrics(connection, metrics)
         affectedWindows.foreach(refreshAlert(connection, _, config.minimumTraffic))
+        refreshBlogMetrics(connection)
 
         connection.commit()
         connection.close()
-        writeSnapshot(config)
         println("[BATCH] id=" + batchId +
           ", events=" + batch.count() +
           ", windows=" + affectedWindows.length)
@@ -312,68 +310,46 @@ private object MySQLBatchSink {
     }
   }
 
-  private def writeSnapshot(config: UserBehaviorRealtimeJob.Config): Unit = {
-    withConnection(config) { connection =>
-      val json = latestMetrics(connection)
-        .map(renderSnapshot)
-        .getOrElse("""{"status":"waiting","metrics":null}""")
-
-      val target = Paths.get(config.snapshotPath).toAbsolutePath.normalize()
-      val parent = target.getParent
-      if (parent != null) {
-        Files.createDirectories(parent)
-      }
-      val temp = target.resolveSibling(target.getFileName.toString + ".tmp")
-      Files.write(temp, json.getBytes(StandardCharsets.UTF_8))
-      try {
-        Files.move(
-          temp,
-          target,
-          StandardCopyOption.REPLACE_EXISTING,
-          StandardCopyOption.ATOMIC_MOVE)
-      } catch {
-        case _: AtomicMoveNotSupportedException =>
-          Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
-      }
-    }
-  }
-
-  private def latestMetrics(connection: Connection): Option[MetricsSnapshot] = {
-    val statement = connection.prepareStatement(
-      """SELECT window_start, window_end, pv, fav_cnt, cart_cnt, buy_cnt,
-        |       alert_type, alert_message
-        |FROM lb_realtime_window_metrics
-        |ORDER BY window_start DESC LIMIT 1""".stripMargin)
+  private def refreshBlogMetrics(connection: Connection): Unit = {
+    val delete = connection.prepareStatement("DELETE FROM lb_realtime_blog_metrics")
     try {
-      val result = statement.executeQuery()
-      if (result.next()) {
-        Some(MetricsSnapshot(
-          result.getTimestamp("window_start"),
-          result.getTimestamp("window_end"),
-          result.getLong("pv"),
-          result.getLong("fav_cnt"),
-          result.getLong("cart_cnt"),
-          result.getLong("buy_cnt"),
-          result.getString("alert_type"),
-          result.getString("alert_message")))
-      } else {
-        None
-      }
+      delete.executeUpdate()
     } finally {
-      statement.close()
+      delete.close()
     }
-  }
 
-  private def renderSnapshot(metrics: MetricsSnapshot): String = {
-    s"""{"status":"running","updated_at":"${new Timestamp(System.currentTimeMillis())}","metrics":{"window_start":"${metrics.windowStart}","window_end":"${metrics.windowEnd}","pv":${metrics.pv},"fav_cnt":${metrics.favCount},"cart_cnt":${metrics.cartCount},"buy_cnt":${metrics.buyCount},"alert_type":"${escape(metrics.alertType)}","alert_message":"${escape(metrics.alertMessage)}"}}"""
-  }
-
-  private def escape(value: String): String = {
-    Option(value).getOrElse("")
-      .replace("\\", "\\\\")
-      .replace("\"", "\\\"")
-      .replace("\n", "\\n")
-      .replace("\r", "\\r")
+    val insert = connection.prepareStatement(
+      """INSERT INTO lb_realtime_blog_metrics
+        |  (window_start, window_label, pv, fav_cnt, cart_cnt, buy_cnt,
+        |   alert_level, alert_type, alert_message, updated_at)
+        |SELECT
+        |  recent.window_start,
+        |  DATE_FORMAT(recent.window_start, '%m-%d %H:%i'),
+        |  recent.pv,
+        |  recent.fav_cnt,
+        |  recent.cart_cnt,
+        |  recent.buy_cnt,
+        |  CASE
+        |    WHEN recent.alert_type = 'normal' THEN 0
+        |    WHEN recent.alert_type IN ('low_traffic', 'low_conversion') THEN 1
+        |    ELSE 2
+        |  END,
+        |  recent.alert_type,
+        |  recent.alert_message,
+        |  recent.updated_at
+        |FROM (
+        |  SELECT window_start, pv, fav_cnt, cart_cnt, buy_cnt,
+        |         alert_type, alert_message, updated_at
+        |  FROM lb_realtime_window_metrics
+        |  ORDER BY updated_at DESC, window_start DESC
+        |  LIMIT 12
+        |) recent
+        |ORDER BY recent.window_start""".stripMargin)
+    try {
+      insert.executeUpdate()
+    } finally {
+      insert.close()
+    }
   }
 
   private def withConnection(

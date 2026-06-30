@@ -19,7 +19,6 @@ MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-bigdata_ana}"
 MYSQL_CREATE_DATABASE="${MYSQL_CREATE_DATABASE:-true}"
-WEB_PORT="${REALTIME_WEB_PORT:-18080}"
 JAR_PATH="${USER_BEHAVIOR_JAR:-$ROOT_DIR/SparkMain/target/userbehavior-realtime.jar}"
 
 start_service() {
@@ -94,34 +93,9 @@ mysql "${MYSQL_ARGS[@]}" "$MYSQL_DATABASE" \
 
 bash "$ROOT_DIR/build_user_behavior_realtime.sh"
 
-mkdir -p "$ROOT_DIR/web/data"
-if [ "${START_REALTIME_WEB:-true}" = "true" ]; then
-    if pgrep -f "python3 -m http.server $WEB_PORT" >/dev/null 2>&1; then
-        echo "[INFO] Realtime dashboard server is already running"
-    elif ss -lnt | grep -Eq "[:.]${WEB_PORT}[[:space:]]"; then
-        echo "[ERROR] Dashboard port is already in use: $WEB_PORT"
-        exit 1
-    else
-        (
-            cd "$ROOT_DIR/web"
-            nohup python3 -m http.server "$WEB_PORT" \
-                > /tmp/luckyanjun-realtime-web.log 2>&1 &
-            echo $! > /tmp/luckyanjun-realtime-web.pid
-        )
-        sleep 1
-        if ! curl -fsS "http://localhost:$WEB_PORT/luckyanjun_realtime.html" \
-            >/dev/null; then
-            echo "[ERROR] Realtime dashboard server failed to start"
-            exit 1
-        fi
-    fi
-    echo "[INFO] Dashboard: http://$(hostname -I | awk '{print $1}'):$WEB_PORT/luckyanjun_realtime.html"
-fi
-
 export MYSQL_JDBC_URL="${MYSQL_JDBC_URL:-jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=utf8&useSSL=false&rewriteBatchedStatements=true}"
 export MYSQL_USER
 export MYSQL_PASSWORD
-export REALTIME_SNAPSHOT_PATH="${REALTIME_SNAPSHOT_PATH:-$ROOT_DIR/web/data/realtime.json}"
 
 echo "[INFO] Starting Spark Structured Streaming"
 echo "[INFO] Kafka source: $BOOTSTRAP/$TOPIC"

@@ -35,7 +35,7 @@ LuckyAnJun 淘宝用户行为个人分析数据流:
 
 ```
 UserBehavior.csv → 清洗与时间字段补充 → HDFS表目录 → Hive外部表 → Spark SQL离线报表
-历史日志回放 → Kafka taobao_behavior → Spark Structured Streaming → 5分钟窗口指标
+历史日志回放 → Kafka taobao_behavior → Spark Structured Streaming → MySQL最近12个窗口 → Blog每秒刷新
 ```
 
 ## 5. 部署架构
