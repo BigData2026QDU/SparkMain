@@ -32,6 +32,8 @@
 
 | File path | Role | Description |
 |---------|------|------|
-| SparkMain/src/main/scala/org/bigdata/streaming/PersonalRealtimeRatings.scala | Personal realtime Spark task | Consumes rating events from Kafka or file stream, computes 5-minute metrics, Top movies, and alerts, then writes Parquet and optional MySQL tables. |
+| SparkMain/src/main/scala/org/bigdata/streaming/PersonalRealtimeRatings.scala | Personal realtime Spark task | Consumes rating events from Kafka or file stream, computes 5-minute metrics, Top movies, alerts, and the Blog overview table, then writes Parquet and optional MySQL tables. |
 | run_personal_realtime.sh | Realtime validation runner | Runs the personal realtime task with guarded output cleanup, optional Spark packages/jars, and optional test table cleanup. |
+| run_realtime_demo_producer.sh | Blog realtime demo producer | Continuously replays MovieLens ratings to Kafka and advances one 5-minute event window about every 4 seconds for visible Blog chart movement. |
+| scripts/continuous_kafka_replay.py | Kafka replay helper | Streams CSV rows to Kafka as JSON rating events with synthetic accelerated event timestamps. |
 | dataset_test/realtime_ratings/ratings_batch_1.csv | Realtime smoke input | Small CSV batch used by file-stream validation and Kafka producer replay. |

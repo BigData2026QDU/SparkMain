@@ -201,20 +201,24 @@ Metrics:
 - average, max, and min rating
 - realtime Top10 movies by rating count
 - low/high average rating alerts
+- realtime Blog overview table (`yc_realtime_overview`) refreshed every batch
 
-The task supports two sources:
+The task supports two sources. Kafka mode is the mode used by the Blog realtime
+report display.
 
 ```bash
 # VM/local validation without Kafka
 export REALTIME_SOURCE=file
 export REALTIME_INPUT_PATH=dataset_test/realtime_ratings
 
-# Kafka mode for integration with the shared workflow
+# Kafka mode for Blog realtime display
 export REALTIME_SOURCE=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-export KAFKA_TOPIC=ratings
-export KAFKA_STARTING_OFFSETS=earliest
-export SPARK_SUBMIT_PACKAGES=org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.6
+export KAFKA_TOPIC=ratings_personal_realtime
+export KAFKA_STARTING_OFFSETS=latest
+export REALTIME_TRIGGER_ONCE=false
+export REALTIME_TRIGGER_INTERVAL="2 seconds"
+export SPARK_SUBMIT_PACKAGES=org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
 ```
 
 ## Build
@@ -264,6 +268,30 @@ Run the personal realtime validation task:
 ./run_personal_realtime.sh
 ```
 
+Run the Blog realtime demo producer in another terminal. It continuously writes
+new Kafka events, advances one 5-minute event-time window about every 4 seconds,
+and makes the Blog chart change while the page refreshes:
+
+```bash
+export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+export KAFKA_TOPIC=ratings_personal_realtime
+./run_realtime_demo_producer.sh
+```
+
+For a visible Blog demo, keep both processes running:
+
+```bash
+# terminal 1: Spark consumes Kafka every 2 seconds
+export REALTIME_SOURCE=kafka
+export REALTIME_TRIGGER_ONCE=false
+export REALTIME_TRIGGER_INTERVAL="2 seconds"
+export KAFKA_TOPIC=ratings_personal_realtime
+./run_personal_realtime.sh
+
+# terminal 2: producer keeps generating accelerated windows
+./run_realtime_demo_producer.sh
+```
+
 ## MySQL Export
 
 Each analysis task writes Parquet output first. If MySQL environment variables
@@ -301,6 +329,7 @@ rating_distribution
 realtime_rating_metrics
 realtime_top_movies
 realtime_rating_alerts
+yc_realtime_overview
 ```
 
 ## Test Data

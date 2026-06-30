@@ -12,7 +12,14 @@ export REALTIME_SOURCE="${REALTIME_SOURCE:-file}"
 export REALTIME_INPUT_PATH="${REALTIME_INPUT_PATH:-dataset_test/realtime_ratings}"
 export REALTIME_OUTPUT_PATH="${REALTIME_OUTPUT_PATH:-output/personal_realtime}"
 export REALTIME_CHECKPOINT_PATH="${REALTIME_CHECKPOINT_PATH:-output/checkpoints/personal_realtime_ratings}"
-export REALTIME_TRIGGER_ONCE="${REALTIME_TRIGGER_ONCE:-true}"
+if [ -z "${REALTIME_TRIGGER_ONCE:-}" ]; then
+  if [ "$REALTIME_SOURCE" = "kafka" ]; then
+    export REALTIME_TRIGGER_ONCE=false
+  else
+    export REALTIME_TRIGGER_ONCE=true
+  fi
+fi
+export REALTIME_TRIGGER_INTERVAL="${REALTIME_TRIGGER_INTERVAL:-2 seconds}"
 export MYSQL_ENABLED="${MYSQL_ENABLED:-false}"
 
 if ! command -v spark-submit >/dev/null 2>&1; then
@@ -72,10 +79,12 @@ clean_mysql_tables_if_requested() {
   local metrics_table="${MYSQL_REALTIME_METRICS_TABLE:-realtime_rating_metrics}"
   local top_movies_table="${MYSQL_REALTIME_TOP_MOVIES_TABLE:-realtime_top_movies}"
   local alerts_table="${MYSQL_REALTIME_ALERTS_TABLE:-realtime_rating_alerts}"
+  local overview_table="${MYSQL_REALTIME_OVERVIEW_TABLE:-yc_realtime_overview}"
 
   validate_table_name "$metrics_table"
   validate_table_name "$top_movies_table"
   validate_table_name "$alerts_table"
+  validate_table_name "$overview_table"
 
   if [ -z "$jdbc_url" ] || [ -z "$mysql_user" ]; then
     echo "[ERROR] MYSQL_CLEAN_TABLES=true requires MYSQL_JDBC_URL and MYSQL_USER"
@@ -102,7 +111,7 @@ clean_mysql_tables_if_requested() {
     -P "$port" \
     -u "$mysql_user" \
     "$db_name" \
-    -e "DROP TABLE IF EXISTS \`$metrics_table\`, \`$top_movies_table\`, \`$alerts_table\`;"
+    -e "DROP TABLE IF EXISTS \`$metrics_table\`, \`$top_movies_table\`, \`$alerts_table\`, \`$overview_table\`;"
 }
 
 validate_table_name() {
@@ -126,6 +135,12 @@ echo "[INFO] Running personal realtime rating analysis"
 echo "[INFO] REALTIME_SOURCE=$REALTIME_SOURCE"
 echo "[INFO] REALTIME_INPUT_PATH=$REALTIME_INPUT_PATH"
 echo "[INFO] REALTIME_OUTPUT_PATH=$REALTIME_OUTPUT_PATH"
+echo "[INFO] REALTIME_TRIGGER_ONCE=$REALTIME_TRIGGER_ONCE"
+echo "[INFO] REALTIME_TRIGGER_INTERVAL=$REALTIME_TRIGGER_INTERVAL"
+if [ "$REALTIME_SOURCE" = "kafka" ]; then
+  echo "[INFO] KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
+  echo "[INFO] KAFKA_TOPIC=${KAFKA_TOPIC:-ratings_personal_realtime}"
+fi
 
 spark_args=(--class org.bigdata.Main --master "$SPARK_MASTER")
 

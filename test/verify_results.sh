@@ -47,6 +47,7 @@ check_file_exists "SparkMain/build.sbt"
 check_file_exists "main_pipeline_new.sh"
 check_file_exists "main_pipeline_test.sh"
 check_file_exists "run_personal_realtime.sh"
+check_file_exists "run_realtime_demo_producer.sh"
 
 echo ""
 echo "=========================================="
@@ -59,6 +60,7 @@ check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeGenres.s
 check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeTime.scala"
 check_file_exists "SparkMain/src/main/scala/org/bigdata/analysis/AnalyzeUsers.scala"
 check_file_exists "SparkMain/src/main/scala/org/bigdata/streaming/PersonalRealtimeRatings.scala"
+check_file_exists "scripts/continuous_kafka_replay.py"
 
 echo ""
 echo "=========================================="

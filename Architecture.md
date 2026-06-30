@@ -47,6 +47,7 @@ Kafka topic ratings_personal_realtime
   -> 5-minute rating window metrics
   -> Parquet output/personal_realtime*
   -> MySQL sparkmain_results realtime_* tables
+  -> Blog realtime report charts
 ```
 
 Main runtime class:
@@ -61,6 +62,13 @@ Outputs:
 realtime_rating_metrics
 realtime_top_movies
 realtime_rating_alerts
+yc_realtime_overview
 ```
 
 For local and VM smoke validation, the same task can replay `dataset_test/realtime_ratings` through a file stream. Strict realtime verification uses `REALTIME_SOURCE=kafka`.
+
+The Blog realtime demo uses `run_realtime_demo_producer.sh` to keep writing
+Kafka events. By default it advances a 5-minute event-time window every 4
+seconds, while Spark Structured Streaming uses a 2-second micro-batch trigger.
+Each micro-batch overwrites `yc_realtime_overview`, so the existing Blog chart
+can show visible changes without a separate realtime page.

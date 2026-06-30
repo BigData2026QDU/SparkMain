@@ -1,5 +1,7 @@
 package org.bigdata.streaming
 
+import java.sql.DriverManager
+
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.Trigger
@@ -16,6 +18,7 @@ final case class PersonalRealtimeConfig(
     outputBasePath: String,
     windowDuration: String,
     triggerOnce: Boolean,
+    triggerInterval: String,
     mysqlEnabled: Boolean,
     mysqlJdbcUrl: String,
     mysqlUser: String,
@@ -23,6 +26,7 @@ final case class PersonalRealtimeConfig(
     metricsTable: String,
     topMoviesTable: String,
     alertsTable: String,
+    overviewTable: String,
     alertMinRatingCount: Long,
     alertLowAvgRating: Double,
     alertHighAvgRating: Double)
@@ -48,19 +52,22 @@ object PersonalRealtimeConfig {
     def doubleValue(name: String, default: Double): Double =
       value(name, default.toString).toDouble
 
+    val sourceValue = value("REALTIME_SOURCE", "file").toLowerCase
+
     PersonalRealtimeConfig(
-      source = value("REALTIME_SOURCE", "file").toLowerCase,
+      source = sourceValue,
       inputPath = value("REALTIME_INPUT_PATH", "dataset_test/realtime_ratings"),
       kafkaBootstrapServers =
         value("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
-      kafkaTopic = value("KAFKA_TOPIC", "ratings"),
+      kafkaTopic = value("KAFKA_TOPIC", "ratings_personal_realtime"),
       kafkaStartingOffsets = value("KAFKA_STARTING_OFFSETS", "latest"),
       checkpointPath =
         value("REALTIME_CHECKPOINT_PATH", "output/checkpoints/personal_realtime_ratings"),
       outputBasePath =
         value("REALTIME_OUTPUT_PATH", "output/personal_realtime"),
       windowDuration = value("REALTIME_WINDOW", "5 minutes"),
-      triggerOnce = flag("REALTIME_TRIGGER_ONCE", default = true),
+      triggerOnce = flag("REALTIME_TRIGGER_ONCE", default = sourceValue != "kafka"),
+      triggerInterval = value("REALTIME_TRIGGER_INTERVAL", "2 seconds"),
       mysqlEnabled = flag("MYSQL_ENABLED", default = false),
       mysqlJdbcUrl = value("MYSQL_JDBC_URL", ""),
       mysqlUser = value("MYSQL_USER", ""),
@@ -68,6 +75,7 @@ object PersonalRealtimeConfig {
       metricsTable = value("MYSQL_REALTIME_METRICS_TABLE", "realtime_rating_metrics"),
       topMoviesTable = value("MYSQL_REALTIME_TOP_MOVIES_TABLE", "realtime_top_movies"),
       alertsTable = value("MYSQL_REALTIME_ALERTS_TABLE", "realtime_rating_alerts"),
+      overviewTable = value("MYSQL_REALTIME_OVERVIEW_TABLE", "yc_realtime_overview"),
       alertMinRatingCount = longValue("REALTIME_ALERT_MIN_COUNT", 2L),
       alertLowAvgRating = doubleValue("REALTIME_ALERT_LOW_AVG", 3.0),
       alertHighAvgRating = doubleValue("REALTIME_ALERT_HIGH_AVG", 4.5))
@@ -81,6 +89,8 @@ object PersonalRealtimeConfig {
  * Kafka mode expects each message value to be a JSON rating record.
  */
 object PersonalRealtimeRatings {
+  private val SafeTableName = "^[A-Za-z0-9_]+$".r
+
   private val RatingSchema = new StructType()
     .add("userId", DataTypes.IntegerType)
     .add("movieId", DataTypes.IntegerType)
@@ -115,11 +125,13 @@ object PersonalRealtimeRatings {
 
     val query =
       if (config.triggerOnce) writer.trigger(Trigger.Once()).start()
-      else writer.trigger(Trigger.ProcessingTime("10 seconds")).start()
+      else writer.trigger(Trigger.ProcessingTime(config.triggerInterval)).start()
 
     println("Personal realtime rating analysis started")
     println(s"source=${config.source}")
     println(s"window=${config.windowDuration}")
+    println(s"triggerOnce=${config.triggerOnce}")
+    println(s"triggerInterval=${config.triggerInterval}")
     println(s"output=${config.outputBasePath}")
     println(if (config.mysqlEnabled) s"mysql=${config.mysqlJdbcUrl}" else "mysql=disabled")
 
@@ -217,6 +229,7 @@ object PersonalRealtimeRatings {
     writeResult(metrics, s"${config.outputBasePath}/metrics", config.metricsTable, config)
     writeResult(topMovies, s"${config.outputBasePath}/top_movies", config.topMoviesTable, config)
     writeResult(alerts, s"${config.outputBasePath}/alerts", config.alertsTable, config)
+    writeOverview(metrics, alerts, batchId, config)
 
     println(s"batch=$batchId metrics")
     metrics.show(20, truncate = false)
@@ -246,6 +259,81 @@ object PersonalRealtimeRatings {
         config.mysqlJdbcUrl,
         props,
         SaveMode.Append)
+    }
+  }
+
+  private def writeOverview(
+      metrics: DataFrame,
+      alerts: DataFrame,
+      batchId: Long,
+      config: PersonalRealtimeConfig): Unit = {
+    if (!config.mysqlEnabled) {
+      return
+    }
+
+    val metricTotals = metrics
+      .agg(
+        coalesce(sum(col("rating_count")), lit(0L)).cast("double").as("rating_events"),
+        count("*").cast("double").as("window_count"),
+        coalesce(round(avg(col("avg_rating")), 2), lit(0.0)).cast("double").as("avg_rating"))
+      .first()
+
+    val alertCount = alerts
+      .agg(count("*").cast("double").as("alert_count"))
+      .first()
+      .getDouble(0)
+
+    val rows = Seq(
+      "rating_events" -> metricTotals.getDouble(0),
+      "window_count" -> metricTotals.getDouble(1),
+      "avg_rating_x100" -> (metricTotals.getDouble(2) * 100.0),
+      "alert_count" -> alertCount,
+      "batch_id" -> batchId.toDouble)
+
+    val tableName = quoteTableName(config.overviewTable)
+    val props = MySQLExporter.createProperties(config.mysqlUser, config.mysqlPassword)
+    val connection = DriverManager.getConnection(config.mysqlJdbcUrl, props)
+    try {
+      connection.setAutoCommit(false)
+      val statement = connection.createStatement()
+      try {
+        statement.executeUpdate(
+          s"CREATE TABLE IF NOT EXISTS $tableName (" +
+            "metric VARCHAR(64) NOT NULL PRIMARY KEY, " +
+            "value DOUBLE NOT NULL)")
+        statement.executeUpdate(s"DELETE FROM $tableName")
+      } finally {
+        statement.close()
+      }
+
+      val insert =
+        connection.prepareStatement(s"INSERT INTO $tableName (metric, value) VALUES (?, ?)")
+      try {
+        rows.foreach { case (metric, value) =>
+          insert.setString(1, metric)
+          insert.setDouble(2, value)
+          insert.addBatch()
+        }
+        insert.executeBatch()
+      } finally {
+        insert.close()
+      }
+      connection.commit()
+    } catch {
+      case error: Throwable =>
+        connection.rollback()
+        throw error
+    } finally {
+      connection.close()
+    }
+  }
+
+  private def quoteTableName(tableName: String): String = {
+    tableName match {
+      case SafeTableName() => s"`$tableName`"
+      case other =>
+        throw new IllegalArgumentException(
+          s"Invalid MySQL table name for realtime overview: $other")
     }
   }
 }
